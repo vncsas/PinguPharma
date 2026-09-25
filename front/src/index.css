@@ -1,0 +1,44 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  body {
+    background: theme("colors.surface.canvas");
+    color: theme("colors.ink.DEFAULT");
+    font-feature-settings: "cv11" on, "ss01" on;
+    -webkit-font-smoothing: antialiased;
+  }
+  ::selection {
+    background: theme("colors.brand.500");
+    color: #fff;
+  }
+  * {
+    border-color: theme("colors.line.DEFAULT");
+  }
+}
+
+@layer components {
+  .card {
+    background: #fff;
+    border-radius: 1rem;
+    box-shadow: theme("boxShadow.card");
+  }
+  .divider {
+    height: 1px;
+    background: theme("colors.line.DEFAULT");
+  }
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: theme("colors.line.strong");
+    border-radius: 999px;
+  }
+}

@@ -1,0 +1,140 @@
+// PinguPharma — Prisma schema (SQLite dev)
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// SQLite has no native enums: use string constants
+// UserRole: ADMIN | MANAGER | SELLER
+// UserStatus: ACTIVE | INACTIVE | BLOCKED
+// SaleStatus: COMPLETED | CANCELED
+// PaymentMethod: CASH | CREDIT | DEBIT | PIX | OTHER
+
+model User {
+  id                String        @id @default(cuid())
+  name              String
+  email             String        @unique
+  passwordHash      String
+  role              String        @default("SELLER")
+  status            String        @default("ACTIVE")
+  twoFactorSecret   String?
+  twoFactorEnabled  Boolean       @default(false)
+  lastLoginAt       DateTime?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  sales             Sale[]
+  activityLogs      ActivityLog[]
+
+  @@map("users")
+}
+
+model Product {
+  id              String    @id @default(cuid())
+  name            String
+  sku             String    @unique
+  description     String?
+  price           Float
+  minStockAlert   Int       @default(0)
+  active          Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  batches         Batch[]
+  saleItems       SaleItem[]
+
+  @@index([name])
+  @@map("products")
+}
+
+model Batch {
+  id              String    @id @default(cuid())
+  productId       String
+  lotNumber       String
+  quantity        Int
+  costPrice       Float
+  expiresAt       DateTime
+  receivedAt      DateTime  @default(now())
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  product         Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  saleItems       SaleItem[]
+
+  @@index([productId])
+  @@index([expiresAt])
+  @@map("batches")
+}
+
+model Customer {
+  id          String   @id @default(cuid())
+  name        String
+  document    String?  @unique
+  phone       String?
+  email       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  sales       Sale[]
+
+  @@map("customers")
+}
+
+model Sale {
+  id             String        @id @default(cuid())
+  userId         String
+  customerId     String?
+  clientName     String        @default("Consumidor Final")
+  paymentMethod  String
+  totalAmount    Float
+  status         String        @default("COMPLETED")
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  user           User          @relation(fields: [userId], references: [id])
+  customer       Customer?     @relation(fields: [customerId], references: [id])
+  items          SaleItem[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("sales")
+}
+
+model SaleItem {
+  id          String   @id @default(cuid())
+  saleId      String
+  productId   String
+  batchId     String?
+  quantity    Int
+  unitPrice   Float
+  subtotal    Float
+
+  sale        Sale     @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  product     Product  @relation(fields: [productId], references: [id])
+  batch       Batch?   @relation(fields: [batchId], references: [id])
+
+  @@index([saleId])
+  @@map("sale_items")
+}
+
+model ActivityLog {
+  id          String   @id @default(cuid())
+  userId      String?
+  action      String
+  entity      String
+  entityId    String?
+  metadata    String?
+  ipAddress   String?
+  createdAt   DateTime @default(now())
+
+  user        User?    @relation(fields: [userId], references: [id])
+
+  @@index([entity, entityId])
+  @@index([createdAt])
+  @@map("activity_logs")
+}
