@@ -286,7 +286,7 @@ function VendasView({ metrics, isLoading, weekTotal, weekCount, avgTicket }: any
 
 // ---------- tab: Estoque ----------
 
-function EstoqueView({ metrics, isLoading }: any) {
+function EstoqueView({ metrics }: any) {
   return (
     <>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -333,7 +333,7 @@ function EstoqueView({ metrics, isLoading }: any) {
 
 // ---------- tab: Compliance ----------
 
-function ComplianceView({ metrics, isLoading }: any) {
+function ComplianceView({ metrics }: any) {
   const total = (metrics?.lowStockCount ?? 0) + (metrics?.expiringSoonCount ?? 0);
   return (
     <>

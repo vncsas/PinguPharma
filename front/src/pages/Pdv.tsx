@@ -78,7 +78,9 @@ export default function PdvPage() {
       qc.invalidateQueries({ queryKey: ["sales"] });
       try {
         await salesApi.openReceipt(sale.id);
-      } catch {}
+      } catch {
+        // A venda já foi registrada; falha ao abrir o recibo não deve bloquear o fluxo.
+      }
       setLastSaleId(sale.id);
       setCart([]);
       setCustomer(null);

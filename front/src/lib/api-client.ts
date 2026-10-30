@@ -70,7 +70,9 @@ export async function apiFetch<T>(
     let body: any = null;
     try {
       body = await res.json();
-    } catch {}
+    } catch {
+      // Resposta de erro sem corpo JSON: segue com os valores padrão abaixo.
+    }
     throw new ApiError(
       res.status,
       body?.error ?? "REQUEST_ERROR",
