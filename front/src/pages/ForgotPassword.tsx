@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { errorMessage } from "@/lib/api-client";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Card } from "@/design-system/components/GlassCard";
 import { Button } from "@/design-system/components/Button";
@@ -22,8 +23,8 @@ export function ForgotPasswordPage() {
       const res = await passwordResetApi.request(email);
       setSent(true);
       if (res.devToken) setDevToken(res.devToken);
-    } catch (err: any) {
-      setError(err.message ?? "Erro ao solicitar");
+    } catch (err) {
+      setError(errorMessage(err, "Erro ao solicitar"));
     } finally {
       setLoading(false);
     }
@@ -117,8 +118,8 @@ export function ResetPasswordPage() {
       await passwordResetApi.confirm(token, password);
       setDone(true);
       setTimeout(() => nav("/login"), 1500);
-    } catch (err: any) {
-      setError(err.message ?? "Erro ao redefinir");
+    } catch (err) {
+      setError(errorMessage(err, "Erro ao redefinir"));
     } finally {
       setLoading(false);
     }

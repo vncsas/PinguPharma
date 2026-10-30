@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { errorMessage } from "@/lib/api-client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Topbar } from "@/design-system/components/Topbar";
 import { Card } from "@/design-system/components/GlassCard";
@@ -163,7 +164,7 @@ function CustomerFormModal({
         ? customersApi.update(initial!.id, form)
         : customersApi.create(form),
     onSuccess,
-    onError: (err: any) => setError(err.message ?? "Erro"),
+    onError: (err) => setError(errorMessage(err, "Erro")),
   });
 
   return (

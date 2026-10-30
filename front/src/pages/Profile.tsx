@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { errorMessage } from "@/lib/api-client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Topbar } from "@/design-system/components/Topbar";
 import { Card } from "@/design-system/components/GlassCard";
@@ -72,7 +73,7 @@ function UpdateProfileCard({ user, refreshMe, qc }: any) {
       qc.invalidateQueries({ queryKey: ["users"] });
       setTimeout(() => setOk(false), 3000);
     },
-    onError: (err: any) => setError(err.message ?? "Erro"),
+    onError: (err) => setError(errorMessage(err, "Erro")),
   });
 
   return (
@@ -117,7 +118,7 @@ function ChangePasswordCard() {
       setConfirm("");
       setTimeout(() => setOk(false), 3000);
     },
-    onError: (err: any) => setError(err.message ?? "Erro"),
+    onError: (err) => setError(errorMessage(err, "Erro")),
   });
 
   return (

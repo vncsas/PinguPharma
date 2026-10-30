@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { errorMessage } from "@/lib/api-client";
 import { useNavigate, Navigate } from "react-router-dom";
 import { Card } from "@/design-system/components/GlassCard";
 import { Button } from "@/design-system/components/Button";
@@ -27,8 +28,8 @@ export default function LoginPage() {
       } else {
         nav("/");
       }
-    } catch (err: any) {
-      setError(err.message ?? "Falha ao autenticar");
+    } catch (err) {
+      setError(errorMessage(err, "Falha ao autenticar"));
     } finally {
       setLoading(false);
     }

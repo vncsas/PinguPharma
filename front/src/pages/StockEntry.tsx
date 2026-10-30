@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { errorMessage } from "@/lib/api-client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Topbar } from "@/design-system/components/Topbar";
 import { Card } from "@/design-system/components/GlassCard";
@@ -71,7 +72,7 @@ export default function StockEntryPage() {
       setCost(0);
       setExp("");
     },
-    onError: (err: any) => setError(err.message ?? "Erro ao registrar lote"),
+    onError: (err) => setError(errorMessage(err, "Erro ao registrar lote")),
   });
 
   const removeMut = useMutation({

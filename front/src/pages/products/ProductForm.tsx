@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { errorMessage } from "@/lib/api-client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { productsApi, type ProductInput } from "@/features/products/api";
@@ -49,7 +50,7 @@ export default function ProductForm() {
       qc.invalidateQueries({ queryKey: ["product", id] });
       nav("/produtos");
     },
-    onError: (err: any) => setError(err.message ?? "Erro ao salvar"),
+    onError: (err) => setError(errorMessage(err, "Erro ao salvar")),
   });
 
   const delMutation = useMutation({

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { errorMessage } from "@/lib/api-client";
 import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { Card } from "@/design-system/components/GlassCard";
 import { Button } from "@/design-system/components/Button";
@@ -24,8 +25,8 @@ export default function Verify2FAPage() {
     try {
       await verify2fa(token!, code);
       nav("/");
-    } catch (err: any) {
-      setError(err.message ?? "Código inválido");
+    } catch (err) {
+      setError(errorMessage(err, "Código inválido"));
     } finally {
       setLoading(false);
     }

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { errorMessage } from "@/lib/api-client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Topbar } from "@/design-system/components/Topbar";
 import { Card } from "@/design-system/components/GlassCard";
@@ -274,7 +275,7 @@ function CreateUserModal({ onClose, onSuccess }: { onClose: () => void; onSucces
   const mut = useMutation({
     mutationFn: () => usersApi.create({ name, email, password, role }),
     onSuccess,
-    onError: (err: any) => setError(err.message ?? "Erro"),
+    onError: (err) => setError(errorMessage(err, "Erro")),
   });
   return (
     <Modal title="Novo usuário" onClose={onClose}>
@@ -347,7 +348,7 @@ function EditUserModal({
   const mut = useMutation({
     mutationFn: () => usersApi.update(user.id, { name, email, role, status }),
     onSuccess,
-    onError: (err: any) => setError(err.message ?? "Erro"),
+    onError: (err) => setError(errorMessage(err, "Erro")),
   });
   return (
     <Modal title={`Editar ${user.name}`} onClose={onClose}>
@@ -420,7 +421,7 @@ function ResetPasswordModal({
   const mut = useMutation({
     mutationFn: () => usersApi.resetPassword(user.id, password),
     onSuccess,
-    onError: (err: any) => setError(err.message ?? "Erro"),
+    onError: (err) => setError(errorMessage(err, "Erro")),
   });
   return (
     <Modal title={`Nova senha para ${user.name}`} onClose={onClose}>
