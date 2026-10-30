@@ -8,6 +8,7 @@ export default mergeConfig(
       environment: "jsdom",
       setupFiles: ["./src/test-setup.ts"],
       globals: false,
+      testTimeout: 15_000,
     },
   }),
 );

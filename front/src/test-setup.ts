@@ -1,9 +1,12 @@
 import "@testing-library/jest-dom/vitest";
-import { cleanup } from "@testing-library/react";
+import { cleanup, configure } from "@testing-library/react";
 import { afterEach } from "vitest";
 
 // `globals: false` desliga o cleanup automático do Testing Library.
 afterEach(cleanup);
+
+// As páginas são lazy: no primeiro acesso o Vitest ainda transforma o módulo, o que passa de 1s.
+configure({ asyncUtilTimeout: 5000 });
 
 // O Node recente define um `localStorage` global próprio que sombreia o do jsdom
 // e não funciona sem flags; um stub em memória deixa os testes determinísticos.
