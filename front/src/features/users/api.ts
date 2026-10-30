@@ -1,6 +1,6 @@
 import { apiFetch } from "@/lib/api-client";
+import type { Role } from "@/features/auth/types";
 
-export type Role = "ADMIN" | "MANAGER" | "SELLER";
 export type UserStatus = "ACTIVE" | "INACTIVE" | "BLOCKED";
 
 export interface UserDTO {

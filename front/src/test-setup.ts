@@ -1,4 +1,9 @@
 import "@testing-library/jest-dom/vitest";
+import { cleanup } from "@testing-library/react";
+import { afterEach } from "vitest";
+
+// `globals: false` desliga o cleanup automático do Testing Library.
+afterEach(cleanup);
 
 // O Node recente define um `localStorage` global próprio que sombreia o do jsdom
 // e não funciona sem flags; um stub em memória deixa os testes determinísticos.

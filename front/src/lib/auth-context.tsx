@@ -1,16 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 import { apiFetch, tokenStore } from "./api-client";
-
-export type Role = "ADMIN" | "MANAGER" | "SELLER";
-
-export interface AuthUser {
-  id: string;
-  name: string;
-  email: string;
-  role: Role;
-  status: string;
-  twoFactorEnabled: boolean;
-}
+import type { AuthUser } from "@/features/auth/types";
 
 interface AuthContextValue {
   user: AuthUser | null;
