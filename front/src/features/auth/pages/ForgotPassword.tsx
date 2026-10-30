@@ -1,5 +1,7 @@
 import { useState } from "react";
-import { errorMessage } from "@/lib/api-client";
+import { FormError } from "@/design-system/ui/FormError";
+import { serverError, useZodForm } from "@/lib/forms";
+import { forgotPasswordSchema, resetPasswordSchema } from "../schemas";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Card } from "@/design-system/ui/GlassCard";
 import { Button } from "@/design-system/ui/Button";
@@ -8,27 +10,22 @@ import { passwordResetApi } from "@/features/auth/password-reset";
 import { ArrowLeft, ArrowRight, KeyRound, Mail } from "lucide-react";
 
 export function ForgotPasswordPage() {
-  const [email, setEmail] = useState("");
-  const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
   const [devToken, setDevToken] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const nav = useNavigate();
+  const { register, handleSubmit, setError, formState } = useZodForm(forgotPasswordSchema, {
+    defaultValues: { email: "" },
+  });
 
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    setLoading(true);
-    setError(null);
+  const submit = handleSubmit(async ({ email }) => {
     try {
       const res = await passwordResetApi.request(email);
       setSent(true);
       if (res.devToken) setDevToken(res.devToken);
     } catch (err) {
-      setError(errorMessage(err, "Erro ao solicitar"));
-    } finally {
-      setLoading(false);
+      setError("root", serverError(err, "Erro ao solicitar"));
     }
-  }
+  });
 
   return (
     <div className="min-h-screen grid place-items-center bg-surface-canvas p-6">
@@ -67,21 +64,20 @@ export function ForgotPasswordPage() {
             </Link>
           </div>
         ) : (
-          <form onSubmit={submit} className="space-y-4">
+          <form onSubmit={submit} noValidate className="space-y-4">
             <Field>
               <Label>E-mail</Label>
               <Input
                 type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                {...register("email")}
+                error={formState.errors.email?.message}
                 leadingIcon={<Mail className="size-4" />}
-                required
               />
             </Field>
-            {error && <p className="text-sm text-accent-rose">{error}</p>}
-            <Button type="submit" className="w-full" size="lg" disabled={loading}>
+            <FormError message={formState.errors.root?.message} />
+            <Button type="submit" className="w-full" size="lg" disabled={formState.isSubmitting}>
               <KeyRound className="size-4" />
-              {loading ? "Enviando..." : "Enviar link"}
+              {formState.isSubmitting ? "Enviando..." : "Enviar link"}
             </Button>
             <Link
               to="/login"
@@ -99,31 +95,21 @@ export function ForgotPasswordPage() {
 export function ResetPasswordPage() {
   const [params] = useSearchParams();
   const token = params.get("token") ?? "";
-  const [password, setPassword] = useState("");
-  const [confirm, setConfirm] = useState("");
-  const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const nav = useNavigate();
+  const { register, handleSubmit, setError, formState } = useZodForm(resetPasswordSchema, {
+    defaultValues: { password: "", confirm: "" },
+  });
 
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
-    if (password !== confirm) {
-      setError("Senhas não coincidem");
-      return;
-    }
-    setLoading(true);
+  const submit = handleSubmit(async ({ password }) => {
     try {
       await passwordResetApi.confirm(token, password);
       setDone(true);
       setTimeout(() => nav("/login"), 1500);
     } catch (err) {
-      setError(errorMessage(err, "Erro ao redefinir"));
-    } finally {
-      setLoading(false);
+      setError("root", serverError(err, "Erro ao redefinir"));
     }
-  }
+  });
 
   if (!token) {
     return (
@@ -151,18 +137,28 @@ export function ResetPasswordPage() {
             Senha redefinida! Redirecionando ao login...
           </div>
         ) : (
-          <form onSubmit={submit} className="space-y-4">
+          <form onSubmit={submit} noValidate className="space-y-4">
             <Field>
               <Label>Nova senha</Label>
-              <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
+              <Input
+                type="password"
+                autoComplete="new-password"
+                {...register("password")}
+                error={formState.errors.password?.message}
+              />
             </Field>
             <Field>
               <Label>Confirmar senha</Label>
-              <Input type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} />
+              <Input
+                type="password"
+                autoComplete="new-password"
+                {...register("confirm")}
+                error={formState.errors.confirm?.message}
+              />
             </Field>
-            {error && <p className="text-sm text-accent-rose">{error}</p>}
-            <Button type="submit" className="w-full" size="lg" disabled={loading || password.length < 8}>
-              {loading ? "Salvando..." : "Redefinir senha"}
+            <FormError message={formState.errors.root?.message} />
+            <Button type="submit" className="w-full" size="lg" disabled={formState.isSubmitting}>
+              {formState.isSubmitting ? "Salvando..." : "Redefinir senha"}
             </Button>
           </form>
         )}

@@ -1,11 +1,14 @@
-import { useState } from "react";
-import { errorMessage } from "@/lib/api-client";
-import { Card } from "@/design-system/ui/GlassCard";
-import { Button } from "@/design-system/ui/Button";
-import { Field, Input, Label } from "@/design-system/ui/Input";
-import { useUpdateProfile } from "@/features/auth/hooks";
-import type { AuthUser } from "@/features/auth/types";
 import { Mail, Save, User as UserIcon } from "lucide-react";
+import { useState } from "react";
+import { Button } from "@/design-system/ui/Button";
+import { FormError } from "@/design-system/ui/FormError";
+import { FormSuccess } from "@/design-system/ui/FormSuccess";
+import { Card } from "@/design-system/ui/GlassCard";
+import { Field, Input, Label } from "@/design-system/ui/Input";
+import { serverError, useZodForm } from "@/lib/forms";
+import { useUpdateProfile } from "../hooks";
+import { updateProfileSchema } from "../schemas";
+import type { AuthUser } from "../types";
 
 /** Use `key={user.id}` no pai: o formulário é reiniciado quando muda o usuário logado. */
 export function UpdateProfileCard({
@@ -15,67 +18,57 @@ export function UpdateProfileCard({
   user: AuthUser | null;
   refreshMe: () => Promise<void>;
 }) {
-  const [name, setName] = useState(user?.name ?? "");
-  const [email, setEmail] = useState(user?.email ?? "");
   const [ok, setOk] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const updateProfile = useUpdateProfile();
+  const { register, handleSubmit, setError, formState } = useZodForm(updateProfileSchema, {
+    defaultValues: { name: user?.name ?? "", email: user?.email ?? "" },
+  });
 
-  const mut = useUpdateProfile();
-
-  function save() {
-    setError(null);
-    mut.mutate(
-      { name, email },
-      {
-        onSuccess: async () => {
-          setOk(true);
-          await refreshMe();
-          setTimeout(() => setOk(false), 3000);
-        },
-        onError: (err) => setError(errorMessage(err, "Erro")),
+  const submit = handleSubmit((values) => {
+    setOk(false);
+    updateProfile.mutate(values, {
+      onSuccess: async () => {
+        setOk(true);
+        await refreshMe();
+        setTimeout(() => setOk(false), 3000);
       },
-    );
-  }
+      onError: (err) => setError("root", serverError(err, "Erro")),
+    });
+  });
 
   return (
     <Card className="space-y-4">
-      <div>
-        <h2 className="text-base font-semibold text-ink">Dados pessoais</h2>
-        <p className="text-xs text-ink-muted">Nome e e-mail que aparecem no sistema.</p>
-      </div>
-      <Field>
-        <Label>Nome</Label>
-        <Input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          leadingIcon={<UserIcon className="size-4" />}
-        />
-      </Field>
-      <Field>
-        <Label>E-mail</Label>
-        <Input
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          leadingIcon={<Mail className="size-4" />}
-        />
-      </Field>
-      {error && (
-        <p className="text-sm text-accent-rose bg-accent-rose/5 border border-accent-rose/20 rounded-lg px-3 py-2">
-          {error}
-        </p>
-      )}
-      {ok && (
-        <p className="text-sm text-accent-success bg-accent-success/5 border border-accent-success/20 rounded-lg px-3 py-2">
-          Dados atualizados.
-        </p>
-      )}
-      <div className="flex justify-end">
-        <Button onClick={save} disabled={mut.isPending || name.length < 2 || !email.includes("@")}>
-          <Save className="size-4" />
-          {mut.isPending ? "Salvando..." : "Salvar alterações"}
-        </Button>
-      </div>
+      <form onSubmit={submit} noValidate className="space-y-4">
+        <div>
+          <h2 className="text-base font-semibold text-ink">Dados pessoais</h2>
+          <p className="text-xs text-ink-muted">Nome e e-mail que aparecem no sistema.</p>
+        </div>
+        <Field>
+          <Label>Nome</Label>
+          <Input
+            {...register("name")}
+            error={formState.errors.name?.message}
+            leadingIcon={<UserIcon className="size-4" />}
+          />
+        </Field>
+        <Field>
+          <Label>E-mail</Label>
+          <Input
+            type="email"
+            {...register("email")}
+            error={formState.errors.email?.message}
+            leadingIcon={<Mail className="size-4" />}
+          />
+        </Field>
+        <FormError message={formState.errors.root?.message} />
+        <FormSuccess message={ok ? "Dados atualizados." : undefined} />
+        <div className="flex justify-end">
+          <Button type="submit" disabled={updateProfile.isPending}>
+            <Save className="size-4" />
+            {updateProfile.isPending ? "Salvando..." : "Salvar alterações"}
+          </Button>
+        </div>
+      </form>
     </Card>
   );
 }

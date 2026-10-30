@@ -1,26 +1,22 @@
-import { useState } from "react";
-import { errorMessage } from "@/lib/api-client";
 import { useNavigate, Navigate } from "react-router-dom";
 import { Card } from "@/design-system/ui/GlassCard";
 import { Button } from "@/design-system/ui/Button";
 import { Field, Input, Label } from "@/design-system/ui/Input";
+import { FormError } from "@/design-system/ui/FormError";
 import { useAuth } from "@/lib/auth-context";
+import { serverError, useZodForm } from "@/lib/forms";
+import { loginSchema } from "../schemas";
 import { ArrowRight, Lock, Mail, ShieldCheck } from "lucide-react";
 
 export default function LoginPage() {
   const { signIn, user } = useAuth();
   const nav = useNavigate();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const form = useZodForm(loginSchema, { defaultValues: { email: "", password: "" } });
+  const { register, handleSubmit, setError, formState } = form;
 
   if (user) return <Navigate to="/" replace />;
 
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    setLoading(true);
-    setError(null);
+  const submit = handleSubmit(async ({ email, password }) => {
     try {
       const result = await signIn(email, password);
       if (result.status === "TWOFA_REQUIRED") {
@@ -29,11 +25,9 @@ export default function LoginPage() {
         nav("/");
       }
     } catch (err) {
-      setError(errorMessage(err, "Falha ao autenticar"));
-    } finally {
-      setLoading(false);
+      setError("root", serverError(err, "Falha ao autenticar"));
     }
-  }
+  });
 
   return (
     <div className="min-h-screen grid lg:grid-cols-[1fr_1fr] bg-surface-canvas">
@@ -76,16 +70,16 @@ export default function LoginPage() {
               Use suas credenciais corporativas. Se o MFA estiver ativo pediremos o código.
             </p>
           </div>
-          <form onSubmit={submit} className="space-y-4">
+          <form onSubmit={submit} noValidate className="space-y-4">
             <Field>
               <Label htmlFor="email">E-mail</Label>
               <Input
                 id="email"
                 type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                autoComplete="username"
+                {...register("email")}
+                error={formState.errors.email?.message}
                 leadingIcon={<Mail className="size-4" />}
-                required
               />
             </Field>
             <Field>
@@ -93,19 +87,15 @@ export default function LoginPage() {
               <Input
                 id="password"
                 type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                autoComplete="current-password"
+                {...register("password")}
+                error={formState.errors.password?.message}
                 leadingIcon={<Lock className="size-4" />}
-                required
               />
             </Field>
-            {error && (
-              <div className="text-sm text-accent-rose bg-accent-rose/5 border border-accent-rose/20 rounded-lg px-3 py-2">
-                {error}
-              </div>
-            )}
-            <Button type="submit" className="w-full" size="lg" disabled={loading}>
-              {loading ? "Entrando..." : "Entrar"}
+            <FormError message={formState.errors.root?.message} />
+            <Button type="submit" className="w-full" size="lg" disabled={formState.isSubmitting}>
+              {formState.isSubmitting ? "Entrando..." : "Entrar"}
               <ArrowRight className="size-4" />
             </Button>
             <a

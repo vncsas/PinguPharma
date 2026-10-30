@@ -1,12 +1,14 @@
-import { useState } from "react";
-import { errorMessage } from "@/lib/api-client";
-import { Button } from "@/design-system/ui/Button";
-import { Input, Field, Label } from "@/design-system/ui/Input";
-import { Dialog } from "@/design-system/ui/Dialog";
-import type { Role } from "@/features/auth/types";
-import { useCreateUser } from "@/features/users/hooks";
-import { ROLES, roleLabel } from "@/features/users/constants";
 import { Mail } from "lucide-react";
+import { Controller } from "react-hook-form";
+import { Button } from "@/design-system/ui/Button";
+import { Dialog } from "@/design-system/ui/Dialog";
+import { FormError } from "@/design-system/ui/FormError";
+import { Field, Input, Label } from "@/design-system/ui/Input";
+import { SegmentedControl } from "@/design-system/ui/SegmentedControl";
+import { serverError, useZodForm } from "@/lib/forms";
+import { roleOptions } from "../constants";
+import { useCreateUser } from "../hooks";
+import { createUserSchema } from "../schemas";
 
 export function CreateUserModal({
   onClose,
@@ -15,70 +17,63 @@ export function CreateUserModal({
   onClose: () => void;
   onSuccess: () => void;
 }) {
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [role, setRole] = useState<Role>("SELLER");
-  const [error, setError] = useState<string | null>(null);
-  const mut = useCreateUser();
+  const createUser = useCreateUser();
+  const { register, control, handleSubmit, setError, formState } = useZodForm(createUserSchema, {
+    defaultValues: { name: "", email: "", password: "", role: "SELLER" },
+  });
+
+  const submit = handleSubmit((values) =>
+    createUser.mutate(values, {
+      onSuccess,
+      onError: (err) => setError("root", serverError(err, "Erro")),
+    }),
+  );
+
   return (
     <Dialog title="Novo usuário" onClose={onClose}>
-      <Field>
-        <Label>Nome</Label>
-        <Input value={name} onChange={(e) => setName(e.target.value)} />
-      </Field>
-      <Field>
-        <Label>E-mail</Label>
-        <Input
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          leadingIcon={<Mail className="size-4" />}
-        />
-      </Field>
-      <Field>
-        <Label>Senha (mín. 8)</Label>
-        <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
-      </Field>
-      <Field>
-        <Label>Papel</Label>
-        <div className="grid grid-cols-3 gap-2">
-          {ROLES.map((r) => (
-            <button
-              key={r}
-              onClick={() => setRole(r)}
-              className={`h-10 rounded-lg text-sm font-medium border ${
-                role === r
-                  ? "bg-brand-500 text-white border-brand-500"
-                  : "bg-white text-ink border-line-strong hover:bg-surface-alt"
-              }`}
-            >
-              {roleLabel[r]}
-            </button>
-          ))}
+      <form onSubmit={submit} noValidate className="space-y-4">
+        <Field>
+          <Label>Nome</Label>
+          <Input {...register("name")} error={formState.errors.name?.message} />
+        </Field>
+        <Field>
+          <Label>E-mail</Label>
+          <Input
+            type="email"
+            {...register("email")}
+            error={formState.errors.email?.message}
+            leadingIcon={<Mail className="size-4" />}
+          />
+        </Field>
+        <Field>
+          <Label>Senha (mín. 8)</Label>
+          <Input
+            type="password"
+            autoComplete="new-password"
+            {...register("password")}
+            error={formState.errors.password?.message}
+          />
+        </Field>
+        <Field>
+          <Label>Papel</Label>
+          <Controller
+            control={control}
+            name="role"
+            render={({ field }) => (
+              <SegmentedControl value={field.value} onChange={field.onChange} options={roleOptions} />
+            )}
+          />
+        </Field>
+        <FormError message={formState.errors.root?.message} />
+        <div className="flex justify-end gap-2 pt-2">
+          <Button type="button" variant="outline" onClick={onClose}>
+            Cancelar
+          </Button>
+          <Button type="submit" disabled={createUser.isPending}>
+            {createUser.isPending ? "Criando..." : "Criar usuário"}
+          </Button>
         </div>
-      </Field>
-      {error && <p className="text-sm text-accent-rose">{error}</p>}
-      <div className="flex justify-end gap-2 pt-2">
-        <Button variant="outline" onClick={onClose}>
-          Cancelar
-        </Button>
-        <Button
-          onClick={() => {
-            setError(null);
-            mut.mutate(
-              { name, email, password, role },
-              {
-                onSuccess,
-                onError: (err) => setError(errorMessage(err, "Erro")),
-              },
-            );
-          }}
-          disabled={mut.isPending || name.length < 2 || password.length < 8}
-        >
-          {mut.isPending ? "Criando..." : "Criar usuário"}
-        </Button>
-      </div>
+      </form>
     </Dialog>
   );
 }

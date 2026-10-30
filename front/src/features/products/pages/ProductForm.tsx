@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
-import { errorMessage } from "@/lib/api-client";
+import { useEffect } from "react";
+import { serverError, useZodForm } from "@/lib/forms";
+import { productSchema } from "../schemas";
+import { FormError } from "@/design-system/ui/FormError";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import type { ProductInput } from "@/features/products/api";
 import {
   useCreateProduct,
   useDeleteProduct,
@@ -16,46 +17,50 @@ import { useConfirm } from "@/design-system/ui/ConfirmDialog";
 import { Field, Input, Label } from "@/design-system/ui/Input";
 import { ArrowLeft, BadgeCheck, Save, Trash2 } from "lucide-react";
 
-const EMPTY: ProductInput = { name: "", sku: "", description: "", price: 0, minStockAlert: 0 };
+const EMPTY = {
+  name: "",
+  sku: "",
+  description: "",
+  price: 0,
+  minStockAlert: 0,
+  active: true,
+};
 
 export default function ProductForm() {
   const confirm = useConfirm();
   const { id } = useParams();
   const isEdit = Boolean(id);
   const nav = useNavigate();
-  const [form, setForm] = useState<ProductInput>(EMPTY);
-  const [active, setActive] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
   const { data } = useProduct(id);
+  const createProduct = useCreateProduct();
+  const updateProduct = useUpdateProduct();
+  const deleteProduct = useDeleteProduct();
+  const saving = createProduct.isPending || updateProduct.isPending;
+  const { register, handleSubmit, reset, setError, formState } = useZodForm(productSchema, {
+    defaultValues: EMPTY,
+  });
 
   useEffect(() => {
-    if (data?.product) {
-      const p = data.product;
-      setForm({
-        name: p.name,
-        sku: p.sku,
-        description: p.description ?? "",
-        price: Number(p.price),
-        minStockAlert: p.minStockAlert,
-      });
-      setActive(p.active);
-    }
-  }, [data]);
+    if (!data?.product) return;
+    const p = data.product;
+    reset({
+      name: p.name,
+      sku: p.sku,
+      description: p.description ?? "",
+      price: Number(p.price),
+      minStockAlert: p.minStockAlert,
+      active: p.active,
+    });
+  }, [data, reset]);
 
-  const createMutation = useCreateProduct();
-  const updateMutation = useUpdateProduct();
-  const delMutation = useDeleteProduct();
-  const mutation = isEdit ? updateMutation : createMutation;
-
-  function submit() {
+  const submit = handleSubmit(({ active, ...input }) => {
     const callbacks = {
       onSuccess: () => nav("/produtos"),
-      onError: (err: unknown) => setError(errorMessage(err, "Erro ao salvar")),
+      onError: (err: unknown) => setError("root", serverError(err, "Erro ao salvar")),
     };
-    if (id) updateMutation.mutate({ id, data: { ...form, active } }, callbacks);
-    else createMutation.mutate(form, callbacks);
-  }
+    if (id) updateProduct.mutate({ id, data: { ...input, active } }, callbacks);
+    else createProduct.mutate(input, callbacks);
+  });
 
   return (
     <div className="space-y-6">
@@ -71,14 +76,7 @@ export default function ProductForm() {
       />
 
       <div className="grid grid-cols-1 xl:grid-cols-[1.6fr_1fr] gap-6">
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            setError(null);
-            submit();
-          }}
-          className="space-y-4"
-        >
+        <form onSubmit={submit} noValidate className="space-y-4">
           <Card className="space-y-5">
             <div>
               <h2 className="text-base font-semibold text-ink">Identificação</h2>
@@ -88,19 +86,14 @@ export default function ProductForm() {
             <div className="grid md:grid-cols-2 gap-4">
               <Field>
                 <Label>Nome comercial</Label>
-                <Input
-                  value={form.name}
-                  onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                  required
-                  minLength={2}
-                />
+                <Input {...register("name")} error={formState.errors.name?.message} />
               </Field>
               <Field>
                 <Label>SKU / Código</Label>
                 <Input
-                  value={form.sku}
-                  onChange={(e) => setForm((f) => ({ ...f, sku: e.target.value.toUpperCase() }))}
-                  required
+                  {...register("sku")}
+                  className="uppercase"
+                  error={formState.errors.sku?.message}
                 />
               </Field>
             </div>
@@ -108,12 +101,14 @@ export default function ProductForm() {
             <Field>
               <Label>Descrição</Label>
               <textarea
-                value={form.description ?? ""}
-                onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+                {...register("description")}
                 rows={4}
                 className="w-full rounded-lg border border-line-strong bg-white px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/15"
                 placeholder="Composição, indicações, tarja, restrições..."
               />
+              {formState.errors.description && (
+                <p className="text-xs text-accent-rose pl-1">{formState.errors.description.message}</p>
+              )}
             </Field>
           </Card>
 
@@ -128,20 +123,16 @@ export default function ProductForm() {
                 <Input
                   type="number"
                   step="0.01"
-                  min={0}
-                  value={form.price}
-                  onChange={(e) => setForm((f) => ({ ...f, price: Number(e.target.value) }))}
-                  required
+                  {...register("price", { valueAsNumber: true })}
+                  error={formState.errors.price?.message}
                 />
               </Field>
               <Field>
                 <Label>Estoque mínimo (un.)</Label>
                 <Input
                   type="number"
-                  min={0}
-                  value={form.minStockAlert}
-                  onChange={(e) => setForm((f) => ({ ...f, minStockAlert: Number(e.target.value) }))}
-                  required
+                  {...register("minStockAlert", { valueAsNumber: true })}
+                  error={formState.errors.minStockAlert?.message}
                 />
               </Field>
             </div>
@@ -151,8 +142,7 @@ export default function ProductForm() {
                 <input
                   id="active"
                   type="checkbox"
-                  checked={active}
-                  onChange={(e) => setActive(e.target.checked)}
+                  {...register("active")}
                   className="size-4 accent-brand-500"
                 />
                 <label htmlFor="active" className="text-sm text-ink">
@@ -162,11 +152,7 @@ export default function ProductForm() {
             )}
           </Card>
 
-          {error && (
-            <div className="text-sm text-accent-rose bg-accent-rose/5 border border-accent-rose/20 rounded-lg px-3 py-2">
-              {error}
-            </div>
-          )}
+          <FormError message={formState.errors.root?.message} />
 
           <div className="flex flex-wrap items-center justify-end gap-2">
             {isEdit && (
@@ -180,9 +166,9 @@ export default function ProductForm() {
                     confirmLabel: "Excluir",
                     danger: true,
                   });
-                  if (ok) delMutation.mutate(id!, { onSuccess: () => nav("/produtos") });
+                  if (ok) deleteProduct.mutate(id!, { onSuccess: () => nav("/produtos") });
                 }}
-                disabled={delMutation.isPending}
+                disabled={deleteProduct.isPending}
               >
                 <Trash2 className="size-4" /> Excluir
               </Button>
@@ -190,9 +176,9 @@ export default function ProductForm() {
             <Button asChild variant="outline">
               <Link to="/produtos">Cancelar</Link>
             </Button>
-            <Button type="submit" disabled={mutation.isPending}>
+            <Button type="submit" disabled={saving}>
               <Save className="size-4" />
-              {mutation.isPending ? "Salvando..." : isEdit ? "Salvar alterações" : "Cadastrar"}
+              {saving ? "Salvando..." : isEdit ? "Salvar alterações" : "Cadastrar"}
             </Button>
           </div>
         </form>
