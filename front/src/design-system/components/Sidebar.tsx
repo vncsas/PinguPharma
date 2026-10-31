@@ -2,8 +2,11 @@ import { NavLink } from "react-router-dom";
 import {
   LayoutDashboard,
   Package,
-  ShoppingBag,
+  Pill,
   History,
+  FileText,
+  Truck,
+  Building2,
   BarChart3,
   Users,
   ShieldAlert,
@@ -13,25 +16,35 @@ import {
   Bell,
   Boxes,
   UserSquare2,
+  ArrowLeftRight,
+  ClipboardList,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
 
-const NAV = [
-  { to: "/", label: "Dashboard", icon: LayoutDashboard, roles: ["ADMIN", "MANAGER", "SELLER"] },
-  { to: "/pdv", label: "PDV", icon: ShoppingBag, roles: ["ADMIN", "MANAGER", "SELLER"] },
-  { to: "/produtos", label: "Produtos", icon: Package, roles: ["ADMIN", "MANAGER"] },
-  { to: "/estoque", label: "Estoque", icon: Boxes, roles: ["ADMIN", "MANAGER"] },
-  { to: "/vendas", label: "Vendas", icon: History, roles: ["ADMIN", "MANAGER"] },
-  { to: "/clientes", label: "Clientes", icon: UserSquare2, roles: ["ADMIN", "MANAGER"] },
-  { to: "/relatorios", label: "Relatórios", icon: BarChart3, roles: ["ADMIN", "MANAGER"] },
+const ALL = ["ADMIN", "MANAGER", "PHARMACIST", "DISPENSER"] as const;
+const STAFF = ["ADMIN", "MANAGER", "PHARMACIST"] as const;
+
+export const NAV = [
+  { to: "/", label: "Dashboard", icon: LayoutDashboard, roles: ALL },
+  { to: "/dispensacao", label: "Dispensação", icon: Pill, roles: ALL },
+  { to: "/pacientes", label: "Pacientes", icon: UserSquare2, roles: ALL },
+  { to: "/receitas", label: "Receitas", icon: FileText, roles: ALL },
+  { to: "/produtos", label: "Produtos", icon: Package, roles: STAFF },
+  { to: "/estoque", label: "Estoque", icon: Boxes, roles: STAFF },
+  { to: "/dispensacoes", label: "Dispensações", icon: History, roles: STAFF },
+  { to: "/transferencias", label: "Transferências", icon: ArrowLeftRight, roles: STAFF },
+  { to: "/controlados", label: "Controlados", icon: ClipboardList, roles: STAFF },
+  { to: "/fornecedores", label: "Fornecedores", icon: Truck, roles: ["ADMIN", "MANAGER"] },
+  { to: "/relatorios", label: "Relatórios", icon: BarChart3, roles: STAFF },
+  { to: "/unidades", label: "Unidades", icon: Building2, roles: ["ADMIN"] },
   { to: "/usuarios", label: "Usuários", icon: Users, roles: ["ADMIN"] },
   { to: "/auditoria", label: "Auditoria", icon: ShieldAlert, roles: ["ADMIN"] },
 ] as const;
 
 export function Sidebar() {
   const { user, signOut } = useAuth();
-  const role = user?.role ?? "SELLER";
+  const role = user?.role ?? "DISPENSER";
   const items = NAV.filter((n) => (n.roles as readonly string[]).includes(role));
   const initials = user?.name
     ?.split(" ")
@@ -55,9 +68,18 @@ export function Sidebar() {
         <RailIcon label="Buscar">
           <Search className="size-4" />
         </RailIcon>
-        <RailIcon label="Alertas">
+        <NavLink
+          to="/notificacoes"
+          title="Alertas"
+          className={({ isActive }) =>
+            cn(
+              "grid size-10 place-items-center rounded-lg",
+              isActive ? "bg-brand-50 text-brand-600" : "text-ink-muted hover:bg-surface-alt hover:text-ink",
+            )
+          }
+        >
           <Bell className="size-4" />
-        </RailIcon>
+        </NavLink>
       </div>
 
       <div className="divider mx-3" />

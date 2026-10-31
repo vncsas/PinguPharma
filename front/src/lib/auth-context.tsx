@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
-import { apiFetch, tokenStore } from "./api-client";
+import { apiFetch, tokenStore, unitStore } from "./api-client";
 
-export type Role = "ADMIN" | "MANAGER" | "SELLER";
+export type Role = "ADMIN" | "MANAGER" | "PHARMACIST" | "DISPENSER";
 
 export interface AuthUser {
   id: string;
@@ -9,6 +9,7 @@ export interface AuthUser {
   email: string;
   role: Role;
   status: string;
+  unitId: string | null;
   twoFactorEnabled: boolean;
 }
 
@@ -83,6 +84,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = useCallback(() => {
     tokenStore.clear();
+    unitStore.set(null);
     setUser(null);
   }, []);
 

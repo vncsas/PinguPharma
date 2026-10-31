@@ -16,6 +16,16 @@ export const tokenStore = {
   },
 };
 
+const UNIT_KEY = "pingu.unit";
+
+export const unitStore = {
+  get: () => localStorage.getItem(UNIT_KEY),
+  set: (id: string | null) => {
+    if (id) localStorage.setItem(UNIT_KEY, id);
+    else localStorage.removeItem(UNIT_KEY);
+  },
+};
+
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -57,6 +67,8 @@ export async function apiFetch<T>(
       finalHeaders["Content-Type"] = "application/json";
     }
     if (auth && token) finalHeaders.Authorization = `Bearer ${token}`;
+    const unitId = unitStore.get();
+    if (auth && unitId) finalHeaders["X-Unit-Id"] = unitId;
     return fetch(`${API_URL}${path}`, { ...rest, body, headers: finalHeaders });
   };
 
@@ -74,7 +86,9 @@ export async function apiFetch<T>(
     throw new ApiError(
       res.status,
       body?.error ?? "REQUEST_ERROR",
-      body?.message ?? res.statusText,
+      res.status === 429
+        ? "Muitas tentativas. Aguarde alguns instantes."
+        : (body?.message ?? res.statusText),
       body?.details,
     );
   }
