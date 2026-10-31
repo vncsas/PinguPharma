@@ -6,6 +6,7 @@ export interface ListUsersInput {
   search?: string;
   role?: UserRole;
   status?: UserStatus;
+  unitId?: string;
 }
 
 export class ListUsersUseCase {

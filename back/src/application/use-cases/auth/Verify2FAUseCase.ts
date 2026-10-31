@@ -26,13 +26,13 @@ export class Verify2FAUseCase {
     const payload = this.tokens.verifyChallenge(input.challengeToken);
     const user = await this.users.findById(payload.sub);
     if (!user || !user.twoFactorEnabled || !user.twoFactorSecret) {
-      throw new UnauthorizedError("2FA not enabled");
+      throw new UnauthorizedError("2FA não está ativado");
     }
     const ok = this.twofa.verify(user.twoFactorSecret, input.code);
-    if (!ok) throw new UnauthorizedError("Invalid 2FA code");
+    if (!ok) throw new UnauthorizedError("Código 2FA inválido");
 
     await this.users.update(user.id, { lastLoginAt: new Date() });
-    const tokens = this.tokens.issuePair({ id: user.id, email: user.email, role: user.role });
+    const tokens = this.tokens.issuePair({ id: user.id, email: user.email, role: user.role, unitId: user.unitId, tokenVersion: user.tokenVersion });
     return { user: toPublicUser(user), tokens };
   }
 }

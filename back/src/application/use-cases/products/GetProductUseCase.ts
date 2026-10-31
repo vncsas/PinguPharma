@@ -5,8 +5,8 @@ import type { ProductWithStock } from "../../../domain/entities/Product.js";
 export class GetProductUseCase {
   constructor(private readonly products: IProductRepository) {}
 
-  async execute(id: string): Promise<ProductWithStock> {
-    const p = await this.products.findById(id);
+  async execute(id: string, unitId?: string): Promise<ProductWithStock> {
+    const p = await this.products.findById(id, unitId);
     if (!p) throw new NotFoundError("Product");
     return p;
   }

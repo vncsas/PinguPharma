@@ -27,13 +27,13 @@ export class LoginUseCase {
 
   async execute(input: LoginInput): Promise<LoginOutput> {
     const user = await this.users.findByEmail(input.email.toLowerCase());
-    if (!user) throw new UnauthorizedError("Invalid credentials");
+    if (!user) throw new UnauthorizedError("Credenciais inválidas");
 
     const ok = await this.hasher.compare(input.password, user.passwordHash);
-    if (!ok) throw new UnauthorizedError("Invalid credentials");
+    if (!ok) throw new UnauthorizedError("Credenciais inválidas");
 
     if (user.status !== "ACTIVE") {
-      throw new ForbiddenError("User is not active");
+      throw new ForbiddenError("Usuário inativo");
     }
 
     if (user.twoFactorEnabled) {
@@ -42,7 +42,7 @@ export class LoginUseCase {
     }
 
     await this.users.update(user.id, { lastLoginAt: new Date() });
-    const tokens = this.tokens.issuePair({ id: user.id, email: user.email, role: user.role });
+    const tokens = this.tokens.issuePair({ id: user.id, email: user.email, role: user.role, unitId: user.unitId, tokenVersion: user.tokenVersion });
     return { status: "AUTHENTICATED", user: toPublicUser(user), tokens };
   }
 }

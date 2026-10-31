@@ -1,7 +1,7 @@
 import type { IUserRepository } from "../../../domain/repositories/IUserRepository.js";
 import type { IHasher } from "../../../domain/services/IHasher.js";
 import type { ITokenService } from "../../../domain/services/ITokenService.js";
-import { NotFoundError, UnauthorizedError, ValidationError } from "../../../shared/errors/AppError.js";
+import { UnauthorizedError, ValidationError } from "../../../shared/errors/AppError.js";
 
 export interface ConfirmPasswordResetInput {
   token: string;
@@ -15,17 +15,21 @@ export class ConfirmPasswordResetUseCase {
     private readonly hasher: IHasher,
   ) {}
 
-  async execute(input: ConfirmPasswordResetInput): Promise<void> {
+  async execute(input: ConfirmPasswordResetInput): Promise<{ userId: string }> {
     if (input.password.length < 8) throw new ValidationError("Senha deve ter ao menos 8 caracteres");
     let payload;
     try {
-      payload = this.tokens.verifyChallenge(input.token);
+      payload = this.tokens.verifyPasswordReset(input.token);
     } catch {
       throw new UnauthorizedError("Token inválido ou expirado");
     }
     const user = await this.users.findById(payload.sub);
-    if (!user) throw new NotFoundError("User");
+    if (!user || user.status !== "ACTIVE" || typeof payload.tv !== "number" || payload.tv !== user.tokenVersion) {
+      throw new UnauthorizedError("Token inválido ou expirado");
+    }
     const passwordHash = await this.hasher.hash(input.password);
     await this.users.update(user.id, { passwordHash });
+    await this.users.incrementTokenVersion(user.id);
+    return { userId: user.id };
   }
 }

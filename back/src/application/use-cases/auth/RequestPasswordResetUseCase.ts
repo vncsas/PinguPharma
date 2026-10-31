@@ -1,6 +1,8 @@
 import type { IUserRepository } from "../../../domain/repositories/IUserRepository.js";
 import type { IMailer } from "../../../domain/services/IMailer.js";
+import type { IEmailTemplates } from "../../../domain/services/IEmailTemplates.js";
 import type { ITokenService } from "../../../domain/services/ITokenService.js";
+import type { ILogger } from "../../../domain/services/ILogger.js";
 
 export interface RequestPasswordResetOutput {
   sent: boolean;
@@ -12,26 +14,21 @@ export class RequestPasswordResetUseCase {
     private readonly users: IUserRepository,
     private readonly tokens: ITokenService,
     private readonly mailer: IMailer,
+    private readonly templates: IEmailTemplates,
     private readonly webBaseUrl: string,
     private readonly exposeDevToken: boolean,
+    private readonly logger: ILogger,
   ) {}
 
   async execute(email: string): Promise<RequestPasswordResetOutput> {
     const user = await this.users.findByEmail(email.toLowerCase());
-    if (!user) return { sent: true };
+    if (!user || user.status !== "ACTIVE") return { sent: true };
 
-    const token = this.tokens.signChallenge({ sub: user.id });
+    const token = this.tokens.signPasswordReset({ sub: user.id, tv: user.tokenVersion });
     const link = `${this.webBaseUrl}/redefinir-senha?token=${encodeURIComponent(token)}`;
-    await this.mailer.send({
-      to: user.email,
-      subject: "PinguPharma — Redefinição de senha",
-      html: `
-        <div style="font-family:Inter,sans-serif;max-width:520px;margin:0 auto;padding:24px;">
-          <h1 style="color:#0A0F1E;font-size:20px;">Solicitação de nova senha</h1>
-          <p style="color:#5B6478;">Você (ou alguém) pediu para redefinir sua senha. Se não foi você, ignore este e-mail.</p>
-          <p><a href="${link}" style="background:#2A4BF0;color:#fff;padding:10px 16px;border-radius:8px;text-decoration:none;">Redefinir senha</a></p>
-          <p style="color:#8A93A6;font-size:12px;">Válido por 5 minutos. Se o botão não funcionar copie: ${link}</p>
-        </div>`,
+    const content = this.templates.passwordReset({ link, expiresInMinutes: 5 });
+    void this.mailer.send({ to: user.email, ...content }).catch((err) => {
+      this.logger.warn({ err: err instanceof Error ? err.message : String(err) }, "Falha ao enviar e-mail de reset");
     });
     return { sent: true, devToken: this.exposeDevToken ? token : undefined };
   }
