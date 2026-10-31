@@ -33,10 +33,12 @@ src/
 ## Telas prontas
 - **/login** — Split-screen com hero glass azul + formulário.
 - **/verificar-2fa** — Desafio TOTP.
-- **/** — Dashboard: 4 stat cards, gráfico Recharts, últimas vendas, alertas.
+- **/** — Dashboard: 4 stat cards, gráfico Recharts, últimas dispensações, alertas.
 - **/produtos** — Listagem paginada, filtros, KPIs superiores.
 - **/produtos/novo** e **/produtos/:id/editar** — Formulário completo com card lateral educativo.
-- **/perfil** — Cadastro/desativação de MFA com QR Code.
+- **/perfil** — MFA com QR Code, troca de senha e preferências de notificação.
+- **/dispensacao**, **/dispensacoes**, **/pacientes**, **/receitas** — Atendimento, histórico, cadastro de pacientes (CPF/CNS) e receitas.
+- **/estoque**, **/transferencias**, **/controlados** — Lotes e movimentações, transferências entre unidades, livro e balanço de controlados.
+- **/relatorios**, **/notificacoes**, **/fornecedores**, **/unidades**, **/usuarios**, **/auditoria**.
 
-## Próximas iterações
-PDV, histórico de vendas, relatórios financeiros, gestão de usuários, auditoria.
+Veja o mapa completo de rotas em `docs/ENDPOINTS.md` e o plano em `docs/PLANO_DE_ACAO.md`.
