@@ -1,4 +1,4 @@
-export type UserRole = "ADMIN" | "MANAGER" | "SELLER";
+export type UserRole = "ADMIN" | "MANAGER" | "PHARMACIST" | "DISPENSER";
 export type UserStatus = "ACTIVE" | "INACTIVE" | "BLOCKED";
 
 export interface User {
@@ -8,16 +8,21 @@ export interface User {
   passwordHash: string;
   role: UserRole;
   status: UserStatus;
+  unitId: string | null;
   twoFactorSecret: string | null;
   twoFactorEnabled: boolean;
   lastLoginAt: Date | null;
+  tokenVersion: number;
   createdAt: Date;
   updatedAt: Date;
 }
 
-export type PublicUser = Omit<User, "passwordHash" | "twoFactorSecret">;
+export type PublicUser = Omit<User, "passwordHash" | "twoFactorSecret" | "tokenVersion">;
 
 export function toPublicUser(u: User): PublicUser {
-  const { passwordHash: _p, twoFactorSecret: _s, ...rest } = u;
-  return rest;
+  const rest: Partial<User> = { ...u };
+  delete rest.passwordHash;
+  delete rest.twoFactorSecret;
+  delete rest.tokenVersion;
+  return rest as PublicUser;
 }
