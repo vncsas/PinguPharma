@@ -1,13 +1,39 @@
 import { apiFetch } from "@/lib/api-client";
 
+export type ControlledClass =
+  | "NONE"
+  | "A1"
+  | "A2"
+  | "A3"
+  | "B1"
+  | "B2"
+  | "C1"
+  | "C2"
+  | "C3"
+  | "C4"
+  | "C5";
+
+export const CONTROLLED_CLASSES: ControlledClass[] = [
+  "NONE", "A1", "A2", "A3", "B1", "B2", "C1", "C2", "C3", "C4", "C5",
+];
+
+export const isControlled = (c: ControlledClass) => c !== "NONE";
+
 export interface ProductDTO {
   id: string;
   name: string;
   sku: string;
   description: string | null;
+  /** Valor de referência (prestação de contas), não é preço de venda. */
   price: number;
   minStockAlert: number;
   active: boolean;
+  controlledClass: ControlledClass;
+  activeIngredient: string | null;
+  presentation: string | null;
+  measureUnit: string | null;
+  manufacturer: string | null;
+  renameCode: string | null;
   createdAt: string;
   updatedAt: string;
   totalStock: number;
@@ -26,6 +52,7 @@ export interface ProductFilters {
   search?: string;
   active?: boolean;
   lowStockOnly?: boolean;
+  controlled?: boolean;
   page?: number;
   pageSize?: number;
 }
@@ -36,6 +63,12 @@ export interface ProductInput {
   description?: string | null;
   price: number;
   minStockAlert: number;
+  controlledClass: ControlledClass;
+  activeIngredient?: string | null;
+  presentation?: string | null;
+  measureUnit?: string | null;
+  manufacturer?: string | null;
+  renameCode?: string | null;
 }
 
 function toQuery(filters: ProductFilters) {
@@ -43,6 +76,7 @@ function toQuery(filters: ProductFilters) {
   if (filters.search) p.set("search", filters.search);
   if (filters.active !== undefined) p.set("active", String(filters.active));
   if (filters.lowStockOnly) p.set("lowStockOnly", "true");
+  if (filters.controlled !== undefined) p.set("controlled", String(filters.controlled));
   if (filters.page) p.set("page", String(filters.page));
   if (filters.pageSize) p.set("pageSize", String(filters.pageSize));
   const qs = p.toString();

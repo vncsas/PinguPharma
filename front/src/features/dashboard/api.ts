@@ -1,18 +1,22 @@
 import { apiFetch } from "@/lib/api-client";
 
 export interface DashboardMetricsDTO {
-  today: { revenue: number; salesCount: number };
-  revenueLast7Days: { date: string; total: number; count: number }[];
-  latestSales: {
+  today: { dispensationsCount: number };
+  dispensationsLast7Days: { date: string; count: number }[];
+  latestDispensations: {
     id: string;
     createdAt: string;
-    totalAmount: number;
     userName: string;
-    clientName: string;
+    patientName: string | null;
     status: string;
   }[];
   lowStockCount: number;
   expiringSoonCount: number;
+  pendingTransfers: number;
+  criticalStockCount: number;
+  expiredBatchesCount: number;
+  lossesLast30Days: { quantity: number; totalValue: number };
+  topConsumed: { productId: string; productName: string; productSku: string; quantity: number }[];
 }
 
 export const dashboardApi = {

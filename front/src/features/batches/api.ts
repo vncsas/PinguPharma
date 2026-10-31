@@ -5,6 +5,12 @@ export interface BatchDTO {
   productId: string;
   productName: string;
   productSku: string;
+  unitId: string;
+  unitName: string;
+  supplierId: string | null;
+  supplierName: string | null;
+  document: string | null;
+  entryType: "ENTRY_PURCHASE" | "ENTRY_DONATION" | "ENTRY_TRANSFER" | null;
   lotNumber: string;
   quantity: number;
   costPrice: number;
@@ -27,6 +33,9 @@ export interface CreateBatchInput {
   quantity: number;
   costPrice: number;
   expiresAt: string;
+  entryType: "ENTRY_PURCHASE" | "ENTRY_DONATION";
+  supplierId?: string | null;
+  document?: string | null;
 }
 
 export interface BatchFilters {

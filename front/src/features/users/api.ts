@@ -1,6 +1,6 @@
 import { apiFetch } from "@/lib/api-client";
 
-export type Role = "ADMIN" | "MANAGER" | "SELLER";
+export type Role = "ADMIN" | "MANAGER" | "PHARMACIST" | "DISPENSER";
 export type UserStatus = "ACTIVE" | "INACTIVE" | "BLOCKED";
 
 export interface UserDTO {
@@ -9,6 +9,7 @@ export interface UserDTO {
   email: string;
   role: Role;
   status: UserStatus;
+  unitId: string | null;
   twoFactorEnabled: boolean;
   lastLoginAt: string | null;
   createdAt: string;
@@ -19,6 +20,7 @@ export interface UserFilters {
   search?: string;
   role?: Role;
   status?: UserStatus;
+  unitId?: string;
 }
 
 export interface CreateUserInput {
@@ -27,6 +29,7 @@ export interface CreateUserInput {
   password: string;
   role: Role;
   status?: UserStatus;
+  unitId?: string | null;
 }
 
 export interface UpdateUserInput {
@@ -34,6 +37,7 @@ export interface UpdateUserInput {
   email?: string;
   role?: Role;
   status?: UserStatus;
+  unitId?: string | null;
 }
 
 function toQuery(f: UserFilters) {
@@ -41,6 +45,7 @@ function toQuery(f: UserFilters) {
   if (f.search) p.set("search", f.search);
   if (f.role) p.set("role", f.role);
   if (f.status) p.set("status", f.status);
+  if (f.unitId) p.set("unitId", f.unitId);
   const qs = p.toString();
   return qs ? `?${qs}` : "";
 }
