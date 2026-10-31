@@ -9,117 +9,300 @@ datasource db {
 }
 
 // SQLite has no native enums: use string constants
-// UserRole: ADMIN | MANAGER | SELLER
+// UserRole: ADMIN | MANAGER | PHARMACIST | DISPENSER
 // UserStatus: ACTIVE | INACTIVE | BLOCKED
-// SaleStatus: COMPLETED | CANCELED
-// PaymentMethod: CASH | CREDIT | DEBIT | PIX | OTHER
+// UnitType: UBS | UPA | CENTRAL | HOSPITAL | OTHER
+// ControlledClass: NONE | A1 | A2 | A3 | B1 | B2 | C1 | C2 | C3 | C4 | C5
+// BatchEntryType: ENTRY_PURCHASE | ENTRY_DONATION | ENTRY_TRANSFER
+// PrescriberCouncil: CRM | CRO | COREN | OTHER
+// SupplierType: BIDDING | DONATION | MUNICIPAL_CENTRAL | OTHER
+// DispensationStatus: COMPLETED | CANCELED
+// StockMovementType: ENTRY_PURCHASE | ENTRY_DONATION | ENTRY_TRANSFER | DISPENSATION | DISPENSATION_CANCEL
+//                    | LOSS_EXPIRED | LOSS_DAMAGE | ADJUSTMENT | TRANSFER_OUT   (quantity signed)
+// TransferStatus: REQUESTED | SENT | RECEIVED | REJECTED | CANCELED
+// NotificationType: EXPIRING_SOON | EXPIRED | LOW_STOCK | SECURITY | SYSTEM | TRANSFER_PENDING | TRANSFER_UPDATE | STOCK_CRITICAL
+
+model Unit {
+  id        String   @id @default(cuid())
+  name      String
+  cnes      String?
+  type      String   @default("UBS")
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users          User[]
+  batches        Batch[]
+  dispensations  Dispensation[]
+  prescriptions  Prescription[]
+  movements      StockMovement[]
+  transfersOut   Transfer[]      @relation("TransferFrom")
+  transfersIn    Transfer[]      @relation("TransferTo")
+
+  @@index([active])
+  @@map("units")
+}
 
 model User {
   id                String        @id @default(cuid())
   name              String
   email             String        @unique
   passwordHash      String
-  role              String        @default("SELLER")
+  role              String        @default("DISPENSER")
   status            String        @default("ACTIVE")
+  unitId            String?
   twoFactorSecret   String?
   twoFactorEnabled  Boolean       @default(false)
   lastLoginAt       DateTime?
+  tokenVersion      Int           @default(0)
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
 
-  sales             Sale[]
+  unit              Unit?         @relation(fields: [unitId], references: [id], onDelete: SetNull)
+  dispensations     Dispensation[] @relation("DispensationDispenser")
+  pharmacistDispensations Dispensation[] @relation("DispensationPharmacist")
+  prescriptions     Prescription[]
+  movements         StockMovement[]
   activityLogs      ActivityLog[]
+  notifications     Notification[]
+  notificationPrefs NotificationPreference[]
 
+  @@index([unitId])
   @@map("users")
 }
 
 model Product {
-  id              String    @id @default(cuid())
-  name            String
-  sku             String    @unique
-  description     String?
-  price           Float
-  minStockAlert   Int       @default(0)
-  active          Boolean   @default(true)
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id               String    @id @default(cuid())
+  name             String
+  sku              String    @unique
+  description      String?
+  price            Float
+  minStockAlert    Int       @default(0)
+  active           Boolean   @default(true)
+  controlledClass  String    @default("NONE")
+  activeIngredient String?
+  presentation     String?
+  measureUnit      String?
+  manufacturer     String?
+  renameCode       String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
-  batches         Batch[]
-  saleItems       SaleItem[]
+  batches          Batch[]
+  dispensationItems DispensationItem[]
+  movements        StockMovement[]
+  transferItems    TransferItem[]
 
   @@index([name])
+  @@index([controlledClass])
   @@map("products")
+}
+
+model Supplier {
+  id        String   @id @default(cuid())
+  name      String
+  cnpj      String?  @unique
+  type      String   @default("BIDDING")
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  batches   Batch[]
+  movements StockMovement[]
+
+  @@map("suppliers")
 }
 
 model Batch {
   id              String    @id @default(cuid())
+  unitId          String
   productId       String
+  supplierId      String?
   lotNumber       String
   quantity        Int
   costPrice       Float
   expiresAt       DateTime
+  document        String?
+  entryType       String?
   receivedAt      DateTime  @default(now())
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
+  unit            Unit      @relation(fields: [unitId], references: [id])
   product         Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
-  saleItems       SaleItem[]
+  supplier        Supplier? @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  dispensationItems DispensationItem[]
+  movements       StockMovement[]
 
   @@index([productId])
   @@index([expiresAt])
+  @@index([unitId])
+  @@index([unitId, productId])
   @@map("batches")
 }
 
-model Customer {
-  id          String   @id @default(cuid())
+model Patient {
+  id          String    @id @default(cuid())
   name        String
-  document    String?  @unique
+  cns         String?   @unique
+  cpf         String?   @unique
+  birthDate   DateTime?
   phone       String?
   email       String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  address     String?
+  notes       String?
+  active      Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
-  sales       Sale[]
+  dispensations Dispensation[]
+  prescriptions Prescription[]
 
-  @@map("customers")
+  @@index([name])
+  @@map("patients")
 }
 
-model Sale {
+model Prescription {
+  id                      String   @id @default(cuid())
+  patientId               String
+  unitId                  String
+  prescriberName          String
+  prescriberCouncil       String   @default("CRM")
+  prescriberCouncilNumber String
+  number                  String?
+  issuedAt                DateTime
+  validUntil              DateTime
+  retained                Boolean  @default(false)
+  notes                   String?
+  createdBy               String
+  createdAt               DateTime @default(now())
+
+  patient       Patient        @relation(fields: [patientId], references: [id])
+  unit          Unit           @relation(fields: [unitId], references: [id])
+  creator       User           @relation(fields: [createdBy], references: [id])
+  dispensations Dispensation[]
+
+  @@index([patientId])
+  @@index([unitId])
+  @@map("prescriptions")
+}
+
+model Dispensation {
   id             String        @id @default(cuid())
+  unitId         String
   userId         String
-  customerId     String?
-  clientName     String        @default("Consumidor Final")
-  paymentMethod  String
-  totalAmount    Float
+  patientId      String?
+  pharmacistId   String?
+  prescriptionId String?
+  totalValue     Float         @default(0)
   status         String        @default("COMPLETED")
+  cancelReason   String?
+  canceledAt     DateTime?
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
-  user           User          @relation(fields: [userId], references: [id])
-  customer       Customer?     @relation(fields: [customerId], references: [id])
-  items          SaleItem[]
+  unit           Unit          @relation(fields: [unitId], references: [id])
+  user           User          @relation("DispensationDispenser", fields: [userId], references: [id])
+  pharmacist     User?         @relation("DispensationPharmacist", fields: [pharmacistId], references: [id], onDelete: SetNull)
+  patient        Patient?      @relation(fields: [patientId], references: [id], onDelete: SetNull)
+  prescription   Prescription? @relation(fields: [prescriptionId], references: [id], onDelete: SetNull)
+  items          DispensationItem[]
 
   @@index([userId])
   @@index([status])
   @@index([createdAt])
-  @@map("sales")
+  @@index([unitId, createdAt])
+  @@index([patientId])
+  @@index([prescriptionId])
+  @@map("dispensations")
 }
 
-model SaleItem {
-  id          String   @id @default(cuid())
-  saleId      String
-  productId   String
-  batchId     String?
-  quantity    Int
-  unitPrice   Float
-  subtotal    Float
+model DispensationItem {
+  id             String   @id @default(cuid())
+  dispensationId String
+  productId      String
+  batchId        String?
+  quantity       Int
+  unitPrice      Float
+  subtotal       Float
 
-  sale        Sale     @relation(fields: [saleId], references: [id], onDelete: Cascade)
-  product     Product  @relation(fields: [productId], references: [id])
-  batch       Batch?   @relation(fields: [batchId], references: [id])
+  dispensation   Dispensation @relation(fields: [dispensationId], references: [id], onDelete: Cascade)
+  product        Product      @relation(fields: [productId], references: [id])
+  batch          Batch?       @relation(fields: [batchId], references: [id])
 
-  @@index([saleId])
-  @@map("sale_items")
+  @@index([dispensationId])
+  @@index([productId])
+  @@map("dispensation_items")
+}
+
+model StockMovement {
+  id         String   @id @default(cuid())
+  unitId     String
+  productId  String
+  batchId    String?
+  type       String
+  quantity   Int
+  reason     String?
+  document   String?
+  supplierId String?
+  refType    String?
+  refId      String?
+  userId     String
+  createdAt  DateTime @default(now())
+
+  unit       Unit      @relation(fields: [unitId], references: [id])
+  product    Product   @relation(fields: [productId], references: [id])
+  batch      Batch?    @relation(fields: [batchId], references: [id], onDelete: SetNull)
+  supplier   Supplier? @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  user       User      @relation(fields: [userId], references: [id])
+
+  @@index([unitId, createdAt])
+  @@index([unitId, productId])
+  @@index([productId])
+  @@index([batchId])
+  @@index([type, createdAt])
+  @@index([refType, refId])
+  @@map("stock_movements")
+}
+
+model Transfer {
+  id          String    @id @default(cuid())
+  fromUnitId  String
+  toUnitId    String
+  status      String    @default("REQUESTED")
+  requestedBy String
+  sentBy      String?
+  receivedBy  String?
+  notes       String?
+  createdAt   DateTime  @default(now())
+  sentAt      DateTime?
+  receivedAt  DateTime?
+
+  fromUnit    Unit      @relation("TransferFrom", fields: [fromUnitId], references: [id])
+  toUnit      Unit      @relation("TransferTo", fields: [toUnitId], references: [id])
+  items       TransferItem[]
+
+  @@index([fromUnitId, status])
+  @@index([toUnitId, status])
+  @@index([createdAt])
+  @@map("transfers")
+}
+
+model TransferItem {
+  id         String    @id @default(cuid())
+  transferId String
+  productId  String
+  quantity   Int
+  batchId    String?
+  lotNumber  String?
+  expiresAt  DateTime?
+  costPrice  Float?
+
+  transfer   Transfer  @relation(fields: [transferId], references: [id], onDelete: Cascade)
+  product    Product   @relation(fields: [productId], references: [id])
+
+  @@index([transferId])
+  @@map("transfer_items")
 }
 
 model ActivityLog {
@@ -137,4 +320,36 @@ model ActivityLog {
   @@index([entity, entityId])
   @@index([createdAt])
   @@map("activity_logs")
+}
+
+model Notification {
+  id          String    @id @default(cuid())
+  userId      String
+  type        String
+  title       String
+  body        String
+  link        String?
+  dedupeKey   String?
+  readAt      DateTime?
+  createdAt   DateTime  @default(now())
+
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, dedupeKey])
+  @@index([userId, readAt])
+  @@index([userId, createdAt])
+  @@map("notifications")
+}
+
+model NotificationPreference {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String
+  inApp     Boolean  @default(true)
+  email     Boolean  @default(true)
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, type])
+  @@map("notification_preferences")
 }
