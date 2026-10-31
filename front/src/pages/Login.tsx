@@ -49,11 +49,11 @@ export default function LoginPage() {
 
         <div className="space-y-6 max-w-md">
           <h1 className="text-4xl font-semibold leading-tight">
-            Gestão farmacêutica limpa, do balcão à auditoria.
+            Gestão da farmácia pública, da dispensação à auditoria.
           </h1>
           <p className="text-white/80">
-            Estoque por lote com FIFO, PDV com leitor de barras, dashboards financeiros e alertas de
-            validade em um único painel.
+            Estoque por lote com FEFO, dispensação rastreada por paciente e receita, controle de
+            medicamentos controlados e alertas de validade em um único painel.
           </p>
           <div className="grid grid-cols-2 gap-3 pt-2">
             <Bullet>Rastreabilidade total por lote</Bullet>

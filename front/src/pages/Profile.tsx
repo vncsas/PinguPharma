@@ -1,3 +1,7 @@
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { Modal } from "@/design-system/components/Modal";
+import { tokenStore } from "@/lib/api-client";
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Topbar } from "@/design-system/components/Topbar";
@@ -5,6 +9,15 @@ import { Card } from "@/design-system/components/GlassCard";
 import { Button } from "@/design-system/components/Button";
 import { Badge } from "@/design-system/components/Badge";
 import { Field, Input, Label } from "@/design-system/components/Input";
+import { Skeleton } from "@/design-system/components/Skeleton";
+import { useToast } from "@/design-system/components/Toast";
+import {
+  NOTIFICATION_TYPES,
+  NOTIFICATION_TYPE_LABEL,
+  useNotificationPreferences,
+  useUpdateNotificationPreferences,
+  type NotificationPreferenceDTO,
+} from "@/features/notifications/api";
 import { authApi } from "@/features/auth/api";
 import { useAuth } from "@/lib/auth-context";
 import { KeyRound, Mail, Save, ShieldCheck, ShieldOff, User as UserIcon } from "lucide-react";
@@ -22,6 +35,7 @@ export default function ProfilePage() {
         <UpdateProfileCard user={user} refreshMe={refreshMe} qc={qc} />
         <ChangePasswordCard />
         <TwoFactorCard user={user} refreshMe={refreshMe} />
+        <NotificationPreferencesCard />
       </div>
     </div>
   );
@@ -102,6 +116,7 @@ function UpdateProfileCard({ user, refreshMe, qc }: any) {
 }
 
 function ChangePasswordCard() {
+  const toast = useToast();
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -110,11 +125,14 @@ function ChangePasswordCard() {
 
   const mut = useMutation({
     mutationFn: () => authApi.changePassword(current, next),
-    onSuccess: () => {
-      setOk(true);
+    onSuccess: ({ tokens }) => {
+      tokenStore.set(tokens.accessToken, tokens.refreshToken);
       setCurrent("");
       setNext("");
       setConfirm("");
+      setError(null);
+      setOk(true);
+      toast.success("Senha alterada com sucesso");
       setTimeout(() => setOk(false), 3000);
     },
     onError: (err: any) => setError(err.message ?? "Erro"),
@@ -158,6 +176,8 @@ function ChangePasswordCard() {
 }
 
 function TwoFactorCard({ user, refreshMe }: any) {
+  const toast = useToast();
+  const [disableOpen, setDisableOpen] = useState(false);
   const [code, setCode] = useState("");
   const setupQuery = useQuery({
     queryKey: ["2fa-setup"],
@@ -169,8 +189,12 @@ function TwoFactorCard({ user, refreshMe }: any) {
     onSuccess: async () => { await refreshMe(); },
   });
   const disableMut = useMutation({
-    mutationFn: authApi.disableTwoFactor,
-    onSuccess: async () => { await refreshMe(); },
+    mutationFn: (password: string) => authApi.disableTwoFactor(password),
+    onSuccess: async () => {
+      await refreshMe();
+      setDisableOpen(false);
+      toast.success("MFA desativado");
+    },
   });
 
   return (
@@ -190,12 +214,19 @@ function TwoFactorCard({ user, refreshMe }: any) {
           <p className="text-sm text-ink-muted">MFA ativo. Se trocou de aparelho, desabilite e configure novamente.</p>
           <Button
             variant="danger"
-            onClick={() => { if (confirm("Desabilitar MFA?")) disableMut.mutate(); }}
-            disabled={disableMut.isPending}
+            onClick={() => { disableMut.reset(); setDisableOpen(true); }}
           >
             <ShieldOff className="size-4" />
-            {disableMut.isPending ? "Desabilitando..." : "Desabilitar MFA"}
+            Desabilitar MFA
           </Button>
+          {disableOpen && (
+            <DisableMfaModal
+              pending={disableMut.isPending}
+              error={disableMut.error?.message ?? null}
+              onSubmit={(password) => disableMut.mutate(password)}
+              onClose={() => setDisableOpen(false)}
+            />
+          )}
         </div>
       ) : (
         <div className="space-y-3">
@@ -231,5 +262,164 @@ function TwoFactorCard({ user, refreshMe }: any) {
         </div>
       )}
     </Card>
+  );
+}
+
+const disableMfaSchema = z.object({
+  password: z.string().min(1, "Informe a senha atual"),
+});
+
+function DisableMfaModal({
+  pending,
+  error,
+  onSubmit,
+  onClose,
+}: {
+  pending: boolean;
+  error: string | null;
+  onSubmit: (password: string) => void;
+  onClose: () => void;
+}) {
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<z.infer<typeof disableMfaSchema>>({ resolver: async (values) => {
+      const r = disableMfaSchema.safeParse(values);
+      if (r.success) return { values: r.data, errors: {} };
+      return {
+        values: {},
+        errors: Object.fromEntries(
+          r.error.issues.map((i) => [i.path[0], { type: i.code, message: i.message }]),
+        ),
+      };
+    },
+  });
+
+  return (
+    <Modal
+      title="Desabilitar MFA"
+      description="Por segurança, confirme sua senha atual para desativar a verificação em dois fatores."
+      onClose={onClose}
+    >
+      <form onSubmit={handleSubmit((v) => onSubmit(v.password))} className="space-y-4">
+        <Field>
+          <Label>Senha atual</Label>
+          <Input
+            type="password"
+            autoComplete="current-password"
+            autoFocus
+            leadingIcon={<KeyRound className="size-4" />}
+            {...register("password")}
+          />
+          {errors.password && <p className="text-xs text-accent-rose">{errors.password.message}</p>}
+        </Field>
+        {error && <p className="text-sm text-accent-rose bg-accent-rose/5 border border-accent-rose/20 rounded-lg px-3 py-2">{error}</p>}
+        <div className="flex justify-end gap-2">
+          <Button type="button" variant="ghost" onClick={onClose} disabled={pending}>Cancelar</Button>
+          <Button type="submit" variant="danger" disabled={pending}>
+            <ShieldOff className="size-4" />
+            {pending ? "Desabilitando..." : "Desabilitar MFA"}
+          </Button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+function NotificationPreferencesCard() {
+  const toast = useToast();
+  const query = useNotificationPreferences();
+  const update = useUpdateNotificationPreferences();
+
+  const prefs: NotificationPreferenceDTO[] = NOTIFICATION_TYPES.map(
+    (type) => query.data?.find((p) => p.type === type) ?? { type, inApp: true, email: true },
+  );
+
+  function toggle(type: NotificationPreferenceDTO["type"], key: "inApp" | "email", value: boolean) {
+    const next = prefs.map((p) => (p.type === type ? { ...p, [key]: value } : p));
+    update.mutate(next, {
+      onSuccess: () => toast.success("Preferências salvas"),
+      onError: (e: Error) => toast.error("Falha ao salvar preferências", e.message),
+    });
+  }
+
+  return (
+    <Card>
+      <div className="mb-4">
+        <h2 className="text-base font-semibold text-ink">Preferências de notificação</h2>
+        <p className="text-xs text-ink-muted">Escolha como deseja ser avisado sobre cada tipo de alerta.</p>
+      </div>
+      {query.isLoading ? (
+        <div className="space-y-2">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Skeleton key={i} className="h-10 w-full" />
+          ))}
+        </div>
+      ) : query.isError ? (
+        <p className="text-sm text-accent-rose">Não foi possível carregar as preferências.</p>
+      ) : (
+        <div className="divide-y divide-line">
+          <div className="grid grid-cols-[1fr_auto_auto] gap-6 pb-2 text-[11px] font-medium uppercase text-ink-muted">
+            <span>Tipo</span>
+            <span className="w-16 text-center">No app</span>
+            <span className="w-16 text-center">E-mail</span>
+          </div>
+          {prefs.map((p) => (
+            <div key={p.type} className="grid grid-cols-[1fr_auto_auto] items-center gap-6 py-2.5">
+              <span className="text-sm text-ink">{NOTIFICATION_TYPE_LABEL[p.type]}</span>
+              <span className="flex w-16 justify-center">
+                <PrefSwitch
+                  label={`${NOTIFICATION_TYPE_LABEL[p.type]}: no app`}
+                  checked={p.inApp}
+                  disabled={update.isPending}
+                  onChange={(v) => toggle(p.type, "inApp", v)}
+                />
+              </span>
+              <span className="flex w-16 justify-center">
+                <PrefSwitch
+                  label={`${NOTIFICATION_TYPE_LABEL[p.type]}: e-mail`}
+                  checked={p.email}
+                  disabled={update.isPending}
+                  onChange={(v) => toggle(p.type, "email", v)}
+                />
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </Card>
+  );
+}
+
+function PrefSwitch({
+  checked,
+  onChange,
+  label,
+  disabled,
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  label: string;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      disabled={disabled}
+      onClick={() => onChange(!checked)}
+      className={`relative h-5 w-9 rounded-full transition-colors disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/30 ${
+        checked ? "bg-brand-500" : "bg-line-strong"
+      }`}
+    >
+      <span
+        className={`absolute top-0.5 left-0.5 size-4 rounded-full bg-white shadow transition-transform ${
+          checked ? "translate-x-4" : ""
+        }`}
+      />
+    </button>
   );
 }

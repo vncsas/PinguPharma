@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useToast } from "@/design-system/components/Toast";
 import { Topbar } from "@/design-system/components/Topbar";
 import { Card } from "@/design-system/components/GlassCard";
 import { Input } from "@/design-system/components/Input";
@@ -17,8 +18,19 @@ const ACTION_TONE: Record<string, "success" | "warn" | "danger" | "brand"> = {
   PRODUCT_CREATED: "success",
   PRODUCT_UPDATED: "warn",
   PRODUCT_DELETED: "danger",
-  SALE_CREATED: "success",
-  SALE_CANCELED: "danger",
+  DISPENSATION_CREATED: "success",
+  DISPENSATION_CANCELED: "danger",
+  PATIENT_CREATED: "success",
+  PATIENT_UPDATED: "warn",
+  PATIENT_DELETED: "danger",
+  PATIENT_VIEWED: "brand",
+  PRESCRIPTION_CREATED: "success",
+  STOCK_LOSS: "danger",
+  STOCK_ADJUSTMENT: "warn",
+  UNIT_CREATED: "success",
+  UNIT_UPDATED: "warn",
+  SUPPLIER_CREATED: "success",
+  SUPPLIER_UPDATED: "warn",
   USER_CREATED: "success",
   USER_UPDATED: "warn",
   USER_DELETED: "danger",
@@ -29,8 +41,19 @@ const ACTION_LABEL: Record<string, string> = {
   PRODUCT_CREATED: "Produto criado",
   PRODUCT_UPDATED: "Produto atualizado",
   PRODUCT_DELETED: "Produto excluído",
-  SALE_CREATED: "Venda registrada",
-  SALE_CANCELED: "Venda cancelada",
+  DISPENSATION_CREATED: "Dispensação registrada",
+  DISPENSATION_CANCELED: "Dispensação cancelada",
+  PATIENT_CREATED: "Paciente cadastrado",
+  PATIENT_UPDATED: "Paciente atualizado",
+  PATIENT_DELETED: "Paciente excluído",
+  PATIENT_VIEWED: "Dados de paciente consultados",
+  PRESCRIPTION_CREATED: "Receita cadastrada",
+  STOCK_LOSS: "Perda de estoque",
+  STOCK_ADJUSTMENT: "Ajuste de estoque",
+  UNIT_CREATED: "Unidade criada",
+  UNIT_UPDATED: "Unidade atualizada",
+  SUPPLIER_CREATED: "Fornecedor cadastrado",
+  SUPPLIER_UPDATED: "Fornecedor atualizado",
   USER_CREATED: "Usuário criado",
   USER_UPDATED: "Usuário atualizado",
   USER_DELETED: "Usuário excluído",
@@ -70,12 +93,15 @@ export default function AuditPage() {
   }, [list.data]);
 
   const qc = useQueryClient();
+  const toast = useToast();
   const alertsMut = useMutation({
     mutationFn: alertsApi.runExpiration,
+    onError: (e: Error) => toast.error("Falha ao disparar alertas", e.message),
     onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: ["audit"] });
-      alert(
-        `Alertas processados.\nVencendo em 30d: ${data.summary.expiringSoon}\nBaixo estoque: ${data.summary.lowStock}\nNotificados: ${data.summary.notifiedRecipients.length}`,
+      toast.success(
+        "Alertas processados",
+        `Vencendo em 30d: ${data.summary.expiringSoon} | Vencidos: ${data.summary.expired} | Baixo estoque: ${data.summary.lowStock} | Estoque crítico: ${data.summary.stockCritical ?? 0} | Unidades: ${data.summary.byUnit?.length ?? 0} | Notificados: ${data.summary.notifiedRecipients.length} | E-mails: ${data.summary.emailsSent}`,
       );
     },
   });

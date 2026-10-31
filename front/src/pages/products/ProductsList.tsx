@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { productsApi } from "@/features/products/api";
+import { isControlled, productsApi } from "@/features/products/api";
 import { Topbar } from "@/design-system/components/Topbar";
 import { Card } from "@/design-system/components/GlassCard";
 import { Button } from "@/design-system/components/Button";
@@ -11,6 +11,8 @@ import { Table, TableShell, Td, Th, Tr } from "@/design-system/components/Table"
 import { StatCard } from "@/design-system/components/StatCard";
 import { Skeleton } from "@/design-system/components/Skeleton";
 import { brl, dateBR } from "@/lib/utils";
+import { useAuth } from "@/lib/auth-context";
+import { MANAGER_ROLES } from "@/lib/roles";
 import {
   ArrowRight,
   Boxes,
@@ -26,16 +28,20 @@ const TABS = [
   { key: "ativos", label: "Ativos" },
   { key: "inativos", label: "Inativos" },
   { key: "baixo", label: "Baixo estoque" },
+  { key: "controlados", label: "Controlados" },
 ];
 
 export default function ProductsList() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [tab, setTab] = useState("todos");
+  const { user } = useAuth();
+  const canEdit = !!user && MANAGER_ROLES.includes(user.role);
 
   const filters = {
     search,
     lowStockOnly: tab === "baixo",
+    controlled: tab === "controlados" ? true : undefined,
     active: tab === "ativos" ? true : tab === "inativos" ? false : undefined,
     page,
     pageSize: 12,
@@ -75,11 +81,13 @@ export default function ProductsList() {
           setPage(1);
         }}
         actions={
-          <Button size="sm" asChild>
-            <Link to="/produtos/novo">
-              <PackagePlus className="size-4" /> Novo produto
-            </Link>
-          </Button>
+          canEdit ? (
+            <Button size="sm" asChild>
+              <Link to="/produtos/novo">
+                <PackagePlus className="size-4" /> Novo produto
+              </Link>
+            </Button>
+          ) : undefined
         }
       />
 
@@ -87,7 +95,7 @@ export default function ProductsList() {
         <StatCard
           label="Itens no catálogo"
           value={data ? String(data.total) : "—"}
-          delta="Portfólio total"
+          delta="Cadastro geral"
           icon={<Boxes className="size-4" />}
         />
         <StatCard
@@ -116,7 +124,7 @@ export default function ProductsList() {
         <div className="flex flex-col md:flex-row md:items-center gap-3">
           <div className="flex-1 max-w-md">
             <Input
-              placeholder="Buscar por nome ou SKU"
+              placeholder="Buscar por nome, código ou princípio ativo"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               leadingIcon={<Search className="size-4" />}
@@ -130,8 +138,9 @@ export default function ProductsList() {
           <thead>
             <tr>
               <Th>Produto</Th>
-              <Th>SKU</Th>
-              <Th className="text-right">Preço</Th>
+              <Th>Código</Th>
+              <Th>Classe</Th>
+              <Th className="text-right">Valor de referência</Th>
               <Th className="text-right">Estoque</Th>
               <Th>Próx. validade</Th>
               <Th>Status</Th>
@@ -142,7 +151,7 @@ export default function ProductsList() {
             {isLoading ? (
               Array.from({ length: 6 }).map((_, i) => (
                 <Tr key={i}>
-                  <Td colSpan={7}><Skeleton className="h-4" /></Td>
+                  <Td colSpan={8}><Skeleton className="h-4" /></Td>
                 </Tr>
               ))
             ) : data && data.data.length > 0 ? (
@@ -157,6 +166,11 @@ export default function ProductsList() {
                         </div>
                         <div>
                           <p className="font-medium text-ink">{p.name}</p>
+                          {(p.activeIngredient || p.presentation) && (
+                            <p className="text-xs text-ink-muted">
+                              {[p.activeIngredient, p.presentation].filter(Boolean).join(" · ")}
+                            </p>
+                          )}
                           <p className="text-xs text-ink-muted">
                             {p.batchCount} lote{p.batchCount === 1 ? "" : "s"} · mín. {p.minStockAlert}
                           </p>
@@ -164,11 +178,19 @@ export default function ProductsList() {
                       </div>
                     </Td>
                     <Td className="font-mono text-xs text-ink-muted">{p.sku}</Td>
+                    <Td>
+                      {isControlled(p.controlledClass) ? (
+                        <Badge tone="danger">Controlado {p.controlledClass}</Badge>
+                      ) : (
+                        <span className="text-ink-subtle text-sm">—</span>
+                      )}
+                    </Td>
                     <Td className="text-right font-medium">{brl(p.price)}</Td>
                     <Td className="text-right">
                       <span className={low ? "text-accent-rose font-semibold" : "font-medium"}>
                         {p.totalStock}
-                      </span>
+                      </span>{" "}
+                      <span className="text-xs text-ink-muted">{p.measureUnit ?? ""}</span>
                     </Td>
                     <Td>
                       {p.nearestExpiration ? (
@@ -187,18 +209,22 @@ export default function ProductsList() {
                       )}
                     </Td>
                     <Td className="text-right">
-                      <Button asChild variant="link" size="sm">
-                        <Link to={`/produtos/${p.id}/editar`}>
-                          Editar <ArrowRight className="size-3.5" />
-                        </Link>
-                      </Button>
+                      {canEdit ? (
+                        <Button asChild variant="link" size="sm">
+                          <Link to={`/produtos/${p.id}/editar`}>
+                            Editar <ArrowRight className="size-3.5" />
+                          </Link>
+                        </Button>
+                      ) : (
+                        <span className="text-xs text-ink-subtle">somente leitura</span>
+                      )}
                     </Td>
                   </Tr>
                 );
               })
             ) : (
               <Tr>
-                <Td colSpan={7} className="text-center text-ink-muted py-12">
+                <Td colSpan={8} className="text-center text-ink-muted py-12">
                   Nenhum produto encontrado com os filtros atuais.
                 </Td>
               </Tr>

@@ -1,9 +1,11 @@
+import { useConfirm } from "@/design-system/components/ConfirmDialog";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Topbar } from "@/design-system/components/Topbar";
 import { Card } from "@/design-system/components/GlassCard";
 import { Button } from "@/design-system/components/Button";
 import { Input, Field, Label } from "@/design-system/components/Input";
+import { Modal } from "@/design-system/components/Modal";
 import { Badge } from "@/design-system/components/Badge";
 import { Table, TableShell, Td, Th, Tr } from "@/design-system/components/Table";
 import { Skeleton } from "@/design-system/components/Skeleton";
@@ -14,6 +16,9 @@ import {
   type UserStatus,
 } from "@/features/users/api";
 import { useAuth } from "@/lib/auth-context";
+import { ALL_ROLES, ROLE_LABEL } from "@/lib/roles";
+import { useUnits } from "@/features/units/api";
+import { useToast } from "@/design-system/components/Toast";
 import { dateBR } from "@/lib/utils";
 import {
   KeyRound,
@@ -22,17 +27,12 @@ import {
   ShieldCheck,
   Trash2,
   UserPlus,
-  X,
 } from "lucide-react";
 
-const ROLES: Role[] = ["ADMIN", "MANAGER", "SELLER"];
+const ROLES: Role[] = ALL_ROLES;
 const STATUSES: UserStatus[] = ["ACTIVE", "INACTIVE", "BLOCKED"];
 
-const roleLabel: Record<Role, string> = {
-  ADMIN: "Administrador",
-  MANAGER: "Gerente",
-  SELLER: "Vendedor",
-};
+const roleLabel = ROLE_LABEL;
 
 const statusLabel: Record<UserStatus, string> = {
   ACTIVE: "Ativo",
@@ -41,6 +41,8 @@ const statusLabel: Record<UserStatus, string> = {
 };
 
 export default function UsersPage() {
+  const confirm = useConfirm();
+  const toast = useToast();
   const { user: current } = useAuth();
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
@@ -49,6 +51,7 @@ export default function UsersPage() {
   const [editing, setEditing] = useState<UserDTO | null>(null);
   const [resetTarget, setResetTarget] = useState<UserDTO | null>(null);
 
+  const unitsQuery = useUnits();
   const list = useQuery({
     queryKey: ["users", search, roleFilter],
     queryFn: () => usersApi.list({ search: search || undefined, role: roleFilter }),
@@ -56,10 +59,16 @@ export default function UsersPage() {
 
   const removeMut = useMutation({
     mutationFn: (id: string) => usersApi.remove(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["users"] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["users"] });
+      toast.success("Usuário excluído");
+    },
+    onError: (err: Error) => toast.error("Não foi possível excluir", err.message),
   });
 
   const users = list.data?.users ?? [];
+  const unitName = (id: string | null) =>
+    id ? (unitsQuery.data?.units.find((u) => u.id === id)?.name ?? "—") : "Todas";
 
   return (
     <div className="space-y-6">
@@ -81,7 +90,7 @@ export default function UsersPage() {
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <div className="flex gap-2 items-center">
+        <div className="flex gap-2 items-center flex-wrap">
           <span className="text-xs text-ink-muted">Papel:</span>
           {ROLES.map((r) => (
             <Chip
@@ -102,6 +111,7 @@ export default function UsersPage() {
               <Th>Usuário</Th>
               <Th>E-mail</Th>
               <Th>Papel</Th>
+              <Th>Unidade</Th>
               <Th>Status</Th>
               <Th>MFA</Th>
               <Th>Último login</Th>
@@ -112,12 +122,12 @@ export default function UsersPage() {
             {list.isLoading ? (
               Array.from({ length: 4 }).map((_, i) => (
                 <Tr key={i}>
-                  <Td colSpan={7}><Skeleton className="h-4" /></Td>
+                  <Td colSpan={8}><Skeleton className="h-4" /></Td>
                 </Tr>
               ))
             ) : users.length === 0 ? (
               <Tr>
-                <Td colSpan={7} className="text-center text-ink-muted py-12">
+                <Td colSpan={8} className="text-center text-ink-muted py-12">
                   Nenhum usuário encontrado.
                 </Td>
               </Tr>
@@ -141,6 +151,7 @@ export default function UsersPage() {
                   <Td>
                     <Badge tone="brand">{roleLabel[u.role]}</Badge>
                   </Td>
+                  <Td className="text-ink-muted">{unitName(u.unitId)}</Td>
                   <Td>
                     <Badge tone={u.status === "ACTIVE" ? "success" : u.status === "BLOCKED" ? "danger" : "warn"} dot>
                       {statusLabel[u.status]}
@@ -173,8 +184,9 @@ export default function UsersPage() {
                     </button>
                     <button
                       disabled={u.id === current?.id}
-                      onClick={() => {
-                        if (confirm(`Excluir usuário ${u.name}?`)) removeMut.mutate(u.id);
+                      onClick={async () => {
+                        if (await confirm({ title: `Excluir usuário ${u.name}?`, confirmLabel: "Excluir", tone: "danger" }))
+                          removeMut.mutate(u.id);
                       }}
                       className="text-xs font-medium text-accent-rose hover:underline disabled:text-ink-subtle disabled:no-underline"
                     >
@@ -241,38 +253,15 @@ function Chip({
   );
 }
 
-function Modal({
-  title,
-  onClose,
-  children,
-}: {
-  title: string;
-  onClose: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-ink/40 backdrop-blur-sm p-4">
-      <div className="card w-full max-w-md !p-0 overflow-hidden">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-line">
-          <h3 className="text-base font-semibold text-ink">{title}</h3>
-          <button onClick={onClose} className="grid size-8 place-items-center rounded hover:bg-surface-alt">
-            <X className="size-4" />
-          </button>
-        </div>
-        <div className="p-6 space-y-4">{children}</div>
-      </div>
-    </div>
-  );
-}
-
 function CreateUserModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState<Role>("SELLER");
+  const [role, setRole] = useState<Role>("DISPENSER");
+  const [unitId, setUnitId] = useState("");
   const [error, setError] = useState<string | null>(null);
   const mut = useMutation({
-    mutationFn: () => usersApi.create({ name, email, password, role }),
+    mutationFn: () => usersApi.create({ name, email, password, role, unitId: role === "ADMIN" ? undefined : unitId }),
     onSuccess,
     onError: (err: any) => setError(err.message ?? "Erro"),
   });
@@ -297,7 +286,7 @@ function CreateUserModal({ onClose, onSuccess }: { onClose: () => void; onSucces
       </Field>
       <Field>
         <Label>Papel</Label>
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 gap-2">
           {ROLES.map((r) => (
             <button
               key={r}
@@ -313,6 +302,12 @@ function CreateUserModal({ onClose, onSuccess }: { onClose: () => void; onSucces
           ))}
         </div>
       </Field>
+      {role !== "ADMIN" && (
+        <Field>
+          <Label>Unidade</Label>
+          <UnitSelect value={unitId} onChange={setUnitId} />
+        </Field>
+      )}
       {error && <p className="text-sm text-accent-rose">{error}</p>}
       <div className="flex justify-end gap-2 pt-2">
         <Button variant="outline" onClick={onClose}>Cancelar</Button>
@@ -321,7 +316,7 @@ function CreateUserModal({ onClose, onSuccess }: { onClose: () => void; onSucces
             setError(null);
             mut.mutate();
           }}
-          disabled={mut.isPending || name.length < 2 || password.length < 8}
+          disabled={mut.isPending || name.length < 2 || password.length < 8 || (role !== "ADMIN" && !unitId)}
         >
           {mut.isPending ? "Criando..." : "Criar usuário"}
         </Button>
@@ -343,9 +338,10 @@ function EditUserModal({
   const [email, setEmail] = useState(user.email);
   const [role, setRole] = useState<Role>(user.role);
   const [status, setStatus] = useState<UserStatus>(user.status);
+  const [unitId, setUnitId] = useState(user.unitId ?? "");
   const [error, setError] = useState<string | null>(null);
   const mut = useMutation({
-    mutationFn: () => usersApi.update(user.id, { name, email, role, status }),
+    mutationFn: () => usersApi.update(user.id, { name, email, role, status, unitId: role === "ADMIN" ? null : unitId || null }),
     onSuccess,
     onError: (err: any) => setError(err.message ?? "Erro"),
   });
@@ -361,7 +357,7 @@ function EditUserModal({
       </Field>
       <Field>
         <Label>Papel</Label>
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 gap-2">
           {ROLES.map((r) => (
             <button
               key={r}
@@ -395,10 +391,16 @@ function EditUserModal({
           ))}
         </div>
       </Field>
+      {role !== "ADMIN" && (
+        <Field>
+          <Label>Unidade</Label>
+          <UnitSelect value={unitId} onChange={setUnitId} />
+        </Field>
+      )}
       {error && <p className="text-sm text-accent-rose">{error}</p>}
       <div className="flex justify-end gap-2 pt-2">
         <Button variant="outline" onClick={onClose}>Cancelar</Button>
-        <Button onClick={() => { setError(null); mut.mutate(); }} disabled={mut.isPending}>
+        <Button onClick={() => { setError(null); mut.mutate(); }} disabled={mut.isPending || (role !== "ADMIN" && !unitId)}>
           {mut.isPending ? "Salvando..." : "Salvar"}
         </Button>
       </div>
@@ -440,5 +442,21 @@ function ResetPasswordModal({
         </Button>
       </div>
     </Modal>
+  );
+}
+
+function UnitSelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const units = useUnits({ activeOnly: true });
+  return (
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className="h-10 w-full rounded-lg border border-line-strong bg-white px-3 text-sm outline-none focus:border-brand-500"
+    >
+      <option value="">Selecione a unidade</option>
+      {units.data?.units.map((u) => (
+        <option key={u.id} value={u.id}>{u.name}</option>
+      ))}
+    </select>
   );
 }

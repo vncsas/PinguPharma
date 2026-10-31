@@ -21,7 +21,7 @@ export function ForgotPasswordPage() {
     try {
       const res = await passwordResetApi.request(email);
       setSent(true);
-      if (res.devToken) setDevToken(res.devToken);
+      if (import.meta.env.DEV && res.devToken) setDevToken(res.devToken);
     } catch (err: any) {
       setError(err.message ?? "Erro ao solicitar");
     } finally {
@@ -43,7 +43,7 @@ export function ForgotPasswordPage() {
         {sent ? (
           <div className="space-y-4">
             <div className="text-sm text-accent-success bg-accent-success/5 border border-accent-success/20 rounded-lg px-3 py-3">
-              Se o e-mail existir, você receberá o link. Verifique a caixa de spam.
+              Se o e-mail existir, enviaremos o link. Verifique a caixa de spam.
             </div>
             {devToken && (
               <div className="text-xs bg-surface-alt border border-line rounded-lg p-3 space-y-2">
