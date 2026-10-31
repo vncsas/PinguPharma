@@ -4,3 +4,6 @@ dist
 .env.local
 *.log
 prisma/*.db
+
+prisma/*.db.bak
+prisma/*.db-journal
