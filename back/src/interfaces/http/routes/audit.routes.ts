@@ -1,10 +1,11 @@
 import type { FastifyInstance } from "fastify";
 import type { Container } from "../../../shared/container/container.js";
+import { parseFilterDate } from "../../../shared/utils/dates.js";
 import { listAuditQuerySchema } from "../dtos/audit.dtos.js";
 import { createAuthMiddleware, requireRole } from "../middlewares/auth.js";
 
 export async function auditRoutes(app: FastifyInstance, container: Container) {
-  const authenticate = createAuthMiddleware(container.services.tokenService);
+  const authenticate = createAuthMiddleware(container.services.tokenService, container.services.sessionValidator);
   const adminOnly = requireRole("ADMIN");
 
   app.get("/audit-logs", { preHandler: [authenticate, adminOnly] }, async (req, reply) => {
@@ -13,8 +14,8 @@ export async function auditRoutes(app: FastifyInstance, container: Container) {
       entity: raw.entity,
       action: raw.action,
       userId: raw.userId,
-      from: raw.from ? new Date(raw.from) : undefined,
-      to: raw.to ? new Date(raw.to) : undefined,
+      from: raw.from ? parseFilterDate(raw.from) : undefined,
+      to: raw.to ? parseFilterDate(raw.to, true) : undefined,
       page: raw.page,
       pageSize: raw.pageSize,
     });

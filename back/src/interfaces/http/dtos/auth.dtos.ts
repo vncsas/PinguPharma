@@ -21,4 +21,8 @@ export const enable2faBodySchema = z.object({
   confirm: z.boolean(),
   code: z.string().min(6).max(8).optional(),
 });
+export const disable2faBodySchema = z.object({
+  password: z.string().min(1).max(128),
+});
+
 export type Enable2FABody = z.infer<typeof enable2faBodySchema>;

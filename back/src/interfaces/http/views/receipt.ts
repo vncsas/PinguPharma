@@ -1,39 +1,10 @@
-import type { SaleDetail } from "../../../domain/repositories/ISaleRepository.js";
+import type { DispensationDetail } from "../../../domain/repositories/IDispensationRepository.js";
 
-const brl = (n: number) =>
-  new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(n);
 const dt = (d: Date) =>
   new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(d);
+const day = (d: Date) => new Intl.DateTimeFormat("pt-BR", { dateStyle: "short" }).format(d);
 
-const PAYMENT_LABEL: Record<string, string> = {
-  CASH: "Dinheiro",
-  CREDIT: "Crédito",
-  DEBIT: "Débito",
-  PIX: "PIX",
-  OTHER: "Outro",
-};
-
-export function renderReceiptHtml(sale: SaleDetail): string {
-  const rows = sale.items
-    .map(
-      (i) => `
-      <tr>
-        <td>${i.quantity}x</td>
-        <td>
-          ${escape(i.productName)}
-          <small>${escape(i.productSku)}${i.lotNumber ? ` · Lote ${escape(i.lotNumber)}` : ""}</small>
-        </td>
-        <td class="right">${brl(i.subtotal)}</td>
-      </tr>`,
-    )
-    .join("");
-
-  return `<!doctype html>
-<html lang="pt-BR">
-<head>
-  <meta charset="utf-8" />
-  <title>Cupom ${sale.id.slice(-8).toUpperCase()}</title>
-  <style>
+const STYLE = `  <style>
     * { box-sizing: border-box; }
     body {
       font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
@@ -46,7 +17,7 @@ export function renderReceiptHtml(sale: SaleDetail): string {
     }
     .receipt {
       background: #fff;
-      width: 320px;
+      width: 360px;
       padding: 24px;
       border-radius: 12px;
       box-shadow: 0 4px 16px -6px rgba(15,23,42,0.12);
@@ -77,7 +48,38 @@ export function renderReceiptHtml(sale: SaleDetail): string {
       .receipt { box-shadow: none; width: 100%; padding: 0; }
       .actions { display: none; }
     }
-  </style>
+  </style>`;
+
+export function renderReceiptHtml(d: DispensationDetail): string {
+  const code = d.id.slice(-8).toUpperCase();
+  const rows = d.items
+    .map(
+      (i) => `
+      <tr>
+        <td>${i.quantity}x</td>
+        <td>
+          ${escape(i.productName)}
+          <small>${escape(i.presentation ?? i.productSku)}${i.lotNumber ? ` · Lote ${escape(i.lotNumber)}` : ""}${i.expiresAt ? ` · Val. ${day(i.expiresAt)}` : ""}</small>
+        </td>
+      </tr>`,
+    )
+    .join("");
+
+  const prescription = d.prescription
+    ? `<div class="row"><span>Receita</span><span>${escape(d.prescription.number ?? d.prescription.id.slice(-8).toUpperCase())}</span></div>
+    <div class="row"><span>Prescritor</span><span>${escape(d.prescription.prescriberName)} (${escape(d.prescription.prescriberCouncil)} ${escape(d.prescription.prescriberCouncilNumber)})</span></div>`
+    : "";
+  const canceled =
+    d.status === "CANCELED"
+      ? `<div class="row"><span>Motivo do cancelamento</span><span>${escape(d.cancelReason)}</span></div>`
+      : "";
+
+  return `<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <title>Comprovante de dispensação ${code}</title>
+  ${STYLE}
 </head>
 <body>
   <div class="receipt">
@@ -85,15 +87,20 @@ export function renderReceiptHtml(sale: SaleDetail): string {
       <div class="logo">P</div>
       <div>
         <h1>PinguPharma</h1>
-        <small>Cupom não fiscal · demonstração</small>
+        <small>Comprovante de dispensação</small>
       </div>
     </div>
-    <div class="row"><span>Nº</span><strong>${sale.id.slice(-8).toUpperCase()}</strong></div>
-    <div class="row"><span>Emitido</span><span>${dt(sale.createdAt)}</span></div>
-    <div class="row"><span>Vendedor</span><span>${escape(sale.userName)}</span></div>
-    <div class="row"><span>Cliente</span><span>${escape(sale.customerName ?? sale.clientName)}</span></div>
-    <div class="row"><span>Pagamento</span><span>${PAYMENT_LABEL[sale.paymentMethod] ?? sale.paymentMethod}</span></div>
-    <div class="row"><span>Status</span><span class="badge ${sale.status === "COMPLETED" ? "completed" : "canceled"}">${sale.status === "COMPLETED" ? "Concluída" : "Cancelada"}</span></div>
+    <div class="row"><span>Nº</span><strong>${code}</strong></div>
+    <div class="row"><span>Unidade</span><span>${escape(d.unitName)}</span></div>
+    <div class="row"><span>Emitido</span><span>${dt(d.createdAt)}</span></div>
+    <div class="row"><span>Dispensado por</span><span>${escape(d.userName)}</span></div>
+    ${d.pharmacistName ? `<div class="row"><span>Farmacêutico</span><span>${escape(d.pharmacistName)}</span></div>` : ""}
+    <div class="row"><span>Paciente</span><span>${escape(d.patientName ?? "Não informado")}</span></div>
+    ${d.patientCpf ? `<div class="row"><span>CPF</span><span>${escape(d.patientCpf)}</span></div>` : ""}
+    ${d.patientCns ? `<div class="row"><span>CNS</span><span>${escape(d.patientCns)}</span></div>` : ""}
+    ${prescription}
+    <div class="row"><span>Status</span><span class="badge ${d.status === "COMPLETED" ? "completed" : "canceled"}">${d.status === "COMPLETED" ? "Concluída" : "Cancelada"}</span></div>
+    ${canceled}
 
     <div class="divider"></div>
 
@@ -103,8 +110,10 @@ export function renderReceiptHtml(sale: SaleDetail): string {
 
     <div class="divider"></div>
 
-    <div class="row total"><span>Total</span><span>${brl(sale.totalAmount)}</span></div>
-    <p style="text-align:center; margin: 16px 0 0; color:#5B6478;">Obrigado pela preferência!</p>
+    <p style="margin: 0; color:#5B6478;">
+      <strong>Orientações:</strong> siga a posologia prescrita, armazene o medicamento conforme a embalagem
+      e procure a unidade em caso de dúvida ou reação adversa.
+    </p>
 
     <div class="actions">
       <button class="secondary" onclick="window.close()">Fechar</button>

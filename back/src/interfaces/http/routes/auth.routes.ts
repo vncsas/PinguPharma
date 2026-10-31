@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import type { Container } from "../../../shared/container/container.js";
 import {
+  disable2faBodySchema,
   enable2faBodySchema,
   loginBodySchema,
   refreshBodySchema,
@@ -9,6 +10,7 @@ import {
 } from "../dtos/auth.dtos.js";
 import { TwoFactorRequiredError } from "../../../shared/errors/AppError.js";
 import { createAuthMiddleware } from "../middlewares/auth.js";
+import { toPublicUser } from "../../../domain/entities/User.js";
 
 const updateProfileBodySchema = z.object({
   name: z.string().min(2).max(120).optional(),
@@ -17,13 +19,15 @@ const updateProfileBodySchema = z.object({
 
 const changePasswordBodySchema = z.object({
   currentPassword: z.string().min(1),
-  newPassword: z.string().min(8),
+  newPassword: z.string().min(8).max(128),
 });
 
-export async function authRoutes(app: FastifyInstance, container: Container) {
-  const authenticate = createAuthMiddleware(container.services.tokenService);
+const authLimit = { max: 10, timeWindow: "15 minutes" };
 
-  app.post("/auth/login", async (req, reply) => {
+export async function authRoutes(app: FastifyInstance, container: Container) {
+  const authenticate = createAuthMiddleware(container.services.tokenService, container.services.sessionValidator);
+
+  app.post("/auth/login", { config: { rateLimit: authLimit } }, async (req, reply) => {
     const body = loginBodySchema.parse(req.body);
     try {
       const result = await container.useCases.login.execute(body);
@@ -44,7 +48,7 @@ export async function authRoutes(app: FastifyInstance, container: Container) {
     return reply.send({ tokens });
   });
 
-  app.post("/auth/2fa/verify", async (req, reply) => {
+  app.post("/auth/2fa/verify", { config: { rateLimit: authLimit } }, async (req, reply) => {
     const body = verify2faBodySchema.parse(req.body);
     const result = await container.useCases.verify2fa.execute(body);
     return reply.send({ status: "AUTHENTICATED", ...result });
@@ -57,18 +61,29 @@ export async function authRoutes(app: FastifyInstance, container: Container) {
       code: body.code,
       confirm: body.confirm,
     });
+    if (result.status === "CONFIRMED") {
+      await container.services.activityLogger.log(
+        { userId: req.currentUser!.sub, ipAddress: req.ip },
+        { action: "TWOFA_ENABLED", entity: "User", entityId: req.currentUser!.sub },
+      );
+    }
     return reply.send(result);
   });
 
   app.delete("/auth/2fa", { preHandler: authenticate }, async (req, reply) => {
-    await container.useCases.enable2fa.disable(req.currentUser!.sub);
+    const body = disable2faBodySchema.parse(req.body);
+    await container.useCases.enable2fa.disable(req.currentUser!.sub, body.password);
+    await container.services.activityLogger.log(
+      { userId: req.currentUser!.sub, ipAddress: req.ip },
+      { action: "TWOFA_DISABLED", entity: "User", entityId: req.currentUser!.sub },
+    );
     return reply.send({ status: "DISABLED" });
   });
 
   app.get("/auth/me", { preHandler: authenticate }, async (req, reply) => {
     const user = await container.repos.userRepo.findById(req.currentUser!.sub);
-    if (!user) return reply.status(404).send({ error: "NOT_FOUND" });
-    const { passwordHash: _p, twoFactorSecret: _s, ...safe } = user;
+    if (!user) return reply.status(404).send({ error: "NOT_FOUND", message: "Usuário não encontrado" });
+    const safe = toPublicUser(user);
     return reply.send({ user: safe });
   });
 
@@ -84,11 +99,11 @@ export async function authRoutes(app: FastifyInstance, container: Container) {
 
   app.post("/auth/change-password", { preHandler: authenticate }, async (req, reply) => {
     const body = changePasswordBodySchema.parse(req.body);
-    await container.useCases.changePassword.execute(req.currentUser!.sub, body);
+    const tokens = await container.useCases.changePassword.execute(req.currentUser!.sub, body);
     await container.services.activityLogger.log(
       { userId: req.currentUser!.sub, ipAddress: req.ip },
       { action: "PASSWORD_CHANGED", entity: "User", entityId: req.currentUser!.sub },
     );
-    return reply.status(204).send();
+    return reply.send({ tokens });
   });
 }

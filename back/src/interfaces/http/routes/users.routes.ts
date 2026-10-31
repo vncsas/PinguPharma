@@ -10,7 +10,7 @@ import {
 import { createAuthMiddleware, requireRole } from "../middlewares/auth.js";
 
 export async function usersRoutes(app: FastifyInstance, container: Container) {
-  const authenticate = createAuthMiddleware(container.services.tokenService);
+  const authenticate = createAuthMiddleware(container.services.tokenService, container.services.sessionValidator);
   const adminOnly = requireRole("ADMIN");
   const logger = container.services.activityLogger;
 

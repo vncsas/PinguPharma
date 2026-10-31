@@ -3,7 +3,7 @@ import type { Container } from "../../../shared/container/container.js";
 import { createAuthMiddleware, requireRole } from "../middlewares/auth.js";
 
 export async function alertsRoutes(app: FastifyInstance, container: Container) {
-  const authenticate = createAuthMiddleware(container.services.tokenService);
+  const authenticate = createAuthMiddleware(container.services.tokenService, container.services.sessionValidator);
   const adminOnly = requireRole("ADMIN");
   const logger = container.services.activityLogger;
 
@@ -13,11 +13,11 @@ export async function alertsRoutes(app: FastifyInstance, container: Container) {
     async (req, reply) => {
       const summary = await container.useCases.checkExpirationAlerts.execute();
       await logger.log(
-        { userId: req.currentUser!.sub, ipAddress: req.ip },
+        { userId: req.user!.id, ipAddress: req.ip },
         {
           action: "ALERTS_TRIGGERED",
           entity: "Alerts",
-          metadata: summary,
+          metadata: { ...summary },
         },
       );
       return reply.send({ summary });

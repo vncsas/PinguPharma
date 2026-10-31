@@ -5,6 +5,6 @@ export const requestResetBodySchema = z.object({
 });
 
 export const confirmResetBodySchema = z.object({
-  token: z.string().min(10),
-  password: z.string().min(8),
+  token: z.string().min(10).max(2048),
+  password: z.string().min(8).max(128),
 });

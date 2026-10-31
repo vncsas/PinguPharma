@@ -1,12 +1,13 @@
 import { z } from "zod";
 
-const roleEnum = z.enum(["ADMIN", "MANAGER", "SELLER"]);
+const roleEnum = z.enum(["ADMIN", "MANAGER", "PHARMACIST", "DISPENSER"]);
 const statusEnum = z.enum(["ACTIVE", "INACTIVE", "BLOCKED"]);
 
 export const listUsersQuerySchema = z.object({
   search: z.string().optional(),
   role: roleEnum.optional(),
   status: statusEnum.optional(),
+  unitId: z.string().optional(),
 });
 
 export const createUserBodySchema = z.object({
@@ -15,6 +16,7 @@ export const createUserBodySchema = z.object({
   password: z.string().min(8),
   role: roleEnum,
   status: statusEnum.optional(),
+  unitId: z.string().min(5).nullish(),
 });
 
 export const updateUserBodySchema = z.object({
@@ -22,6 +24,7 @@ export const updateUserBodySchema = z.object({
   email: z.string().email().optional(),
   role: roleEnum.optional(),
   status: statusEnum.optional(),
+  unitId: z.string().min(5).nullable().optional(),
 });
 
 export const resetPasswordBodySchema = z.object({
