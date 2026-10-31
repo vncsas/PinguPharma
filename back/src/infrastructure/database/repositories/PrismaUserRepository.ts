@@ -7,7 +7,10 @@ import type {
 import type { User, UserRole, UserStatus } from "../../../domain/entities/User.js";
 
 export class PrismaUserRepository implements IUserRepository {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(
+    private readonly prisma: PrismaClient,
+    private readonly onChange: (userId: string) => void = () => {},
+  ) {}
 
   async findById(id: string): Promise<User | null> {
     const u = await this.prisma.user.findUnique({ where: { id } });
@@ -19,12 +22,13 @@ export class PrismaUserRepository implements IUserRepository {
     return u as User | null;
   }
 
-  async list(params: { search?: string; role?: UserRole; status?: UserStatus } = {}): Promise<User[]> {
+  async list(params: { search?: string; role?: UserRole; status?: UserStatus; unitId?: string } = {}): Promise<User[]> {
     const users = await this.prisma.user.findMany({
       where: {
         AND: [
           params.role ? { role: params.role } : {},
           params.status ? { status: params.status } : {},
+          params.unitId ? { unitId: params.unitId } : {},
           params.search
             ? {
                 OR: [
@@ -47,10 +51,32 @@ export class PrismaUserRepository implements IUserRepository {
 
   async update(id: string, data: UpdateUserData): Promise<User> {
     const u = await this.prisma.user.update({ where: { id }, data });
+    this.onChange(id);
     return u as User;
   }
 
   async delete(id: string): Promise<void> {
     await this.prisma.user.delete({ where: { id } });
+    this.onChange(id);
+  }
+
+  async listRecipients(unitId: string, roles: UserRole[]): Promise<User[]> {
+    const users = await this.prisma.user.findMany({
+      where: {
+        status: "ACTIVE",
+        OR: [{ role: "ADMIN" }, { unitId, role: { in: roles } }],
+      },
+    });
+    return users as User[];
+  }
+
+  async incrementTokenVersion(userId: string): Promise<number> {
+    const u = await this.prisma.user.update({
+      where: { id: userId },
+      data: { tokenVersion: { increment: 1 } },
+      select: { tokenVersion: true },
+    });
+    this.onChange(userId);
+    return u.tokenVersion;
   }
 }
