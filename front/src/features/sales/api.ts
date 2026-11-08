@@ -1,6 +1,4 @@
-import { apiFetch, tokenStore } from "@/lib/api-client";
-
-const API_URL = import.meta.env.VITE_API_URL ?? "/api/v1";
+import { apiBlob, apiFetch, openBlob } from "@/lib/api-client";
 
 export type PaymentMethod = "CASH" | "CREDIT" | "DEBIT" | "PIX" | "OTHER";
 export type SaleStatus = "COMPLETED" | "CANCELED";
@@ -89,17 +87,7 @@ export const salesApi = {
   cancel: (id: string) =>
     apiFetch<{ sale: SaleDetailDTO }>(`/sales/${id}/cancel`, { method: "POST" }),
   openReceipt: async (id: string) => {
-    const token = tokenStore.getAccess();
-    const res = await fetch(`${API_URL}/sales/${id}/receipt`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    });
-    if (!res.ok) throw new Error("Falha ao gerar cupom");
-    const html = await res.text();
-    const blob = new Blob([html], { type: "text/html" });
-    const url = URL.createObjectURL(blob);
-    const win = window.open(url, "_blank", "noopener");
-    if (win) {
-      setTimeout(() => URL.revokeObjectURL(url), 60_000);
-    }
+    const html = await apiBlob(`/sales/${id}/receipt`);
+    openBlob(new Blob([html], { type: "text/html" }));
   },
 };

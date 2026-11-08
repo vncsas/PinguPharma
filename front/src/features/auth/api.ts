@@ -1,4 +1,5 @@
 import { apiFetch } from "@/lib/api-client";
+import type { AuthUser } from "./types";
 
 export interface TwoFactorSetupPayload {
   status: "SETUP" | "CONFIRMED";
@@ -16,6 +17,12 @@ export const authApi = {
       method: "POST",
       body: JSON.stringify({ confirm: true, code }),
     }),
-  disableTwoFactor: () =>
-    apiFetch<{ status: "DISABLED" }>("/auth/2fa", { method: "DELETE" }),
+  disableTwoFactor: () => apiFetch<{ status: "DISABLED" }>("/auth/2fa", { method: "DELETE" }),
+  updateProfile: (data: { name?: string; email?: string }) =>
+    apiFetch<{ user: AuthUser }>("/auth/me", { method: "PUT", body: JSON.stringify(data) }),
+  changePassword: (currentPassword: string, newPassword: string) =>
+    apiFetch<void>("/auth/change-password", {
+      method: "POST",
+      body: JSON.stringify({ currentPassword, newPassword }),
+    }),
 };
